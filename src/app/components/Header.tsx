@@ -1,7 +1,7 @@
 import { Building2, User, Menu, Shield } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { motion } from "motion/react";
-import logo from "figma:asset/482221208ce2694bfbd00f953045a69d75c76c41.png";
+import logo from "../../assets/482221208ce2694bfbd00f953045a69d75c76c41.png";
 
 export function Header() {
   const location = useLocation();

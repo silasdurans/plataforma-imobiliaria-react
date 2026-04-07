@@ -8,7 +8,7 @@ import { properties } from "../data/properties";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
-import heroBackground from "figma:asset/0fa28a804d596717eca062a20b6d2ca8d1630f0a.png";
+import heroBackground from "../../assets/0fa28a804d596717eca062a20b6d2ca8d1630f0a.png";
 
 export default function Home() {
   const navigate = useNavigate();
