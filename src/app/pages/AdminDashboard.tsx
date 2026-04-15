@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "motion/react";
 import { 
   Building2, 
@@ -133,6 +133,31 @@ export default function AdminDashboard() {
     }
   };
 
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      maximumFractionDigits: 0,
+    }).format(value);
+
+  const formatRelativeTime = (value?: string) => {
+    if (!value) return "Agora";
+
+    const target = new Date(value).getTime();
+    if (Number.isNaN(target)) return "Agora";
+
+    const diffInMinutes = Math.max(0, Math.round((Date.now() - target) / 60000));
+
+    if (diffInMinutes < 1) return "Agora";
+    if (diffInMinutes < 60) return `${diffInMinutes} min atrás`;
+
+    const diffInHours = Math.round(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours} h atrás`;
+
+    const diffInDays = Math.round(diffInHours / 24);
+    return `${diffInDays} d atrás`;
+  };
+
   // Funções de análise de dados
   const getPropertyTypeDistribution = () => {
     const typeCount = properties.reduce((acc, property) => {
@@ -143,7 +168,12 @@ export default function AdminDashboard() {
     const colors = {
       'apartamento': '#3B82F6',
       'casa': '#10B981',
-      'terreno': '#F59E0B'
+      'terreno': '#F59E0B',
+      'sala comercial': '#06B6D4',
+      'escritório': '#8B5CF6',
+      'escritorio': '#8B5CF6',
+      'coworking': '#14B8A6',
+      'loja': '#F97316',
     };
 
     return Object.entries(typeCount).map(([type, count]) => ({
@@ -185,17 +215,34 @@ export default function AdminDashboard() {
   };
 
   const getPriceTrends = () => {
-    // Simula dados de tendência de preços (últimos 6 meses)
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-    const basePrice = properties.length > 0 
-      ? properties.reduce((sum, p) => sum + p.price, 0) / properties.length 
-      : 1000000;
+    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
+    const months = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date();
+      date.setDate(1);
+      date.setMonth(date.getMonth() - (5 - index));
+      return date;
+    });
 
-    return months.map((month, index) => ({
-      month,
-      avgPrice: Math.round(basePrice * (0.9 + Math.random() * 0.2)),
-      listings: Math.floor(Math.random() * 20) + 5
-    }));
+    return months.map((monthDate) => {
+      const monthKey = `${monthDate.getFullYear()}-${monthDate.getMonth()}`;
+      const monthProperties = properties.filter((property) => {
+        const createdAt = property.created_at ? new Date(property.created_at) : null;
+        if (!createdAt || Number.isNaN(createdAt.getTime())) {
+          return false;
+        }
+        return `${createdAt.getFullYear()}-${createdAt.getMonth()}` === monthKey;
+      });
+
+      const avgPrice = monthProperties.length > 0
+        ? Math.round(monthProperties.reduce((sum, property) => sum + property.price, 0) / monthProperties.length)
+        : 0;
+
+      return {
+        month: formatter.format(monthDate).replace('.', ''),
+        avgPrice,
+        listings: monthProperties.length,
+      };
+    });
   };
 
   const getAnalyticsStats = () => {
@@ -203,14 +250,20 @@ export default function AdminDashboard() {
     const avgPrice = properties.length > 0 ? totalValue / properties.length : 0;
     const totalArea = properties.reduce((sum, p) => sum + p.area, 0);
     const avgArea = properties.length > 0 ? totalArea / properties.length : 0;
+    const availableProperties = properties.filter((p) => p.status === 'disponivel').length;
+    const bookedSchedules = schedules.filter((item) => item.status !== 'cancelado').length;
+    const topLocation = getPriceByLocation()[0]?.location ?? 'Sem dados';
 
     return {
       totalProperties: properties.length,
+      availableProperties,
+      bookedSchedules,
       totalValue: Math.round(totalValue),
       avgPrice: Math.round(avgPrice),
       avgArea: Math.round(avgArea),
       mostExpensive: properties.length > 0 ? Math.max(...properties.map(p => p.price)) : 0,
-      cheapest: properties.length > 0 ? Math.min(...properties.map(p => p.price)) : 0
+      cheapest: properties.length > 0 ? Math.min(...properties.map(p => p.price)) : 0,
+      topLocation,
     };
   };
 
@@ -334,13 +387,13 @@ export default function AdminDashboard() {
     setShowScheduleModal(true);
   };
 
-  const handleDeleteSchedule = (id: number) => {
+  const handleDeleteSchedule = async (id: number) => {
     if (confirm('Deseja excluir este agendamento?')) {
-      removeSchedule(id);
+      await removeSchedule(id);
     }
   };
 
-  const handleSaveSchedule = () => {
+  const handleSaveSchedule = async () => {
     if (
       !scheduleForm.propertyTitle.trim() ||
       !scheduleForm.clientName.trim() ||
@@ -353,9 +406,9 @@ export default function AdminDashboard() {
     }
 
     if (editingSchedule) {
-      persistScheduleUpdate(editingSchedule.id, scheduleForm);
+      await persistScheduleUpdate(editingSchedule.id, scheduleForm);
     } else {
-      createSchedule({
+      await createSchedule({
         propertyTitle: scheduleForm.propertyTitle,
         clientName: scheduleForm.clientName,
         clientEmail: scheduleForm.clientEmail,
@@ -377,32 +430,108 @@ export default function AdminDashboard() {
 
     return { total, confirmed, pending, canceled };
   };
+  const scheduleSummary = useMemo(() => getScheduleSummary(), [schedules]);
+  const analyticsStats = useMemo(() => getAnalyticsStats(), [properties, schedules]);
 
-  // Mock data
-  const stats = {
-    totalProperties: 247,
-    activeListings: 189,
-    totalViews: 15234,
-    monthlyRevenue: 1250000,
-    occupancyRate: 87,
-    avgRating: 4.7,
-    newInquiries: 34
+  const overviewStats = useMemo(() => [
+    {
+      label: "Total de Imóveis",
+      value: analyticsStats.totalProperties,
+      change: `${analyticsStats.availableProperties} disponíveis`,
+      icon: Building2,
+      color: "from-blue-500 to-cyan-600",
+      bgColor: "from-blue-50 to-cyan-50",
+    },
+    {
+      label: "Agendamentos",
+      value: scheduleSummary.total.toLocaleString(),
+      change: `${scheduleSummary.confirmed} confirmados`,
+      icon: Calendar,
+      color: "from-purple-500 to-violet-600",
+      bgColor: "from-purple-50 to-violet-50",
+    },
+    {
+      label: "Ticket Médio",
+      value: formatCurrency(analyticsStats.avgPrice),
+      change: `${analyticsStats.avgArea} m² em média`,
+      icon: DollarSign,
+      color: "from-green-500 to-emerald-600",
+      bgColor: "from-green-50 to-emerald-50",
+    },
+    {
+      label: "Carteira Ativa",
+      value: formatCurrency(analyticsStats.totalValue),
+      change: analyticsStats.topLocation,
+      icon: TrendingUp,
+      color: "from-orange-500 to-amber-600",
+      bgColor: "from-orange-50 to-amber-50",
+    },
+  ], [analyticsStats, scheduleSummary]);
+
+  const recentActivities = useMemo(() => {
+    const scheduleActivities = schedules
+      .slice()
+      .sort((first, second) =>
+        new Date(second.createdAt ?? 0).getTime() - new Date(first.createdAt ?? 0).getTime(),
+      )
+      .slice(0, 4)
+      .map((schedule) => ({
+        id: `schedule-${schedule.id}`,
+        type: "booking" as const,
+        property: schedule.propertyTitle,
+        user: schedule.clientName,
+        time: formatRelativeTime(schedule.createdAt),
+        status: schedule.status,
+      }));
+
+    const recentProperties = properties
+      .slice()
+      .sort((first, second) =>
+        new Date(second.created_at ?? 0).getTime() - new Date(first.created_at ?? 0).getTime(),
+      )
+      .slice(0, 2)
+      .map((property) => ({
+        id: `property-${property.id}`,
+        type: "property" as const,
+        property: property.title,
+        user: "Cadastro do sistema",
+        time: formatRelativeTime(property.created_at),
+        status: property.status,
+      }));
+
+    return [...scheduleActivities, ...recentProperties].slice(0, 6);
+  }, [properties, schedules]);
+
+  const topProperties = useMemo(() => {
+    return properties
+      .map((property) => {
+        const leads = schedules.filter((schedule) => schedule.propertyTitle === property.title).length;
+        const confirmed = schedules.filter(
+          (schedule) => schedule.propertyTitle === property.title && schedule.status === "confirmado",
+        ).length;
+
+        return {
+          id: property.id,
+          name: property.title,
+          leads,
+          confirmed,
+          revenue: formatCurrency(property.price),
+          rating: property.rating ?? 0,
+        };
+      })
+      .sort((first, second) => {
+        if (second.leads !== first.leads) return second.leads - first.leads;
+        if (second.confirmed !== first.confirmed) return second.confirmed - first.confirmed;
+        return second.rating - first.rating;
+      })
+      .slice(0, 4);
+  }, [properties, schedules]);
+
+  const getPropertyStatusStyles = (status: Property["status"]) => {
+    if (status === "vendido") return "bg-rose-100 text-rose-700";
+    if (status === "alugado") return "bg-amber-100 text-amber-700";
+    return "bg-emerald-100 text-emerald-700";
   };
-
-  const recentActivities = [
-    { id: 1, type: "view", property: "Escritório Premium - Paulista", time: "2 min atrás", user: "João Silva" },
-    { id: 2, type: "inquiry", property: "Coworking Moderno - Vila Olímpia", time: "15 min atrás", user: "Maria Santos" },
-    { id: 3, type: "booking", property: "Sala Comercial - Centro", time: "1 hora atrás", user: "Pedro Costa" },
-    { id: 4, type: "review", property: "Loja Térrea - Shopping", time: "2 horas atrás", user: "Ana Lima", rating: 5 },
-    { id: 5, type: "view", property: "Escritório Executivo - Faria Lima", time: "3 horas atrás", user: "Carlos Mendes" },
-  ];
-
-  const topProperties = [
-    { id: 1, name: "Escritório Premium - Av. Paulista", views: 1234, leads: 45, revenue: "R$ 85.000" },
-    { id: 2, name: "Coworking Moderno - Vila Olímpia", views: 1089, leads: 38, revenue: "R$ 72.000" },
-    { id: 3, name: "Sala Executiva - Faria Lima", views: 987, leads: 32, revenue: "R$ 65.000" },
-    { id: 4, name: "Loja Comercial - Shopping", views: 856, leads: 28, revenue: "R$ 58.000" },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -511,40 +640,7 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  { 
-                    label: "Total de Imóveis", 
-                    value: stats.totalProperties, 
-                    change: "+12%", 
-                    icon: Building2, 
-                    color: "from-blue-500 to-cyan-600",
-                    bgColor: "from-blue-50 to-cyan-50"
-                  },
-                  { 
-                    label: "Visualizações", 
-                    value: stats.totalViews.toLocaleString(), 
-                    change: "+23%", 
-                    icon: Eye, 
-                    color: "from-purple-500 to-violet-600",
-                    bgColor: "from-purple-50 to-violet-50"
-                  },
-                  { 
-                    label: "Anúncios Ativos", 
-                    value: stats.activeListings, 
-                    change: "+6%", 
-                    icon: Users, 
-                    color: "from-green-500 to-emerald-600",
-                    bgColor: "from-green-50 to-emerald-50"
-                  },
-                  { 
-                    label: "Receita Mensal", 
-                    value: `R$ ${(stats.monthlyRevenue / 1000).toFixed(0)}K`, 
-                    change: "+15%", 
-                    icon: DollarSign, 
-                    color: "from-orange-500 to-amber-600",
-                    bgColor: "from-orange-50 to-amber-50"
-                  },
-                ].map((stat, i) => (
+                {overviewStats.map((stat, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, y: 20 }}
@@ -556,7 +652,7 @@ export default function AdminDashboard() {
                       <div className={`p-3 bg-gradient-to-br ${stat.color} rounded-xl shadow-lg`}>
                         <stat.icon className="size-6 text-white" />
                       </div>
-                      <span className="text-sm font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                      <span className="text-sm font-semibold text-slate-700 bg-white/80 px-2 py-1 rounded-full">
                         {stat.change}
                       </span>
                     </div>
@@ -588,15 +684,10 @@ export default function AdminDashboard() {
                     {recentActivities.map((activity) => (
                       <div key={activity.id} className="flex items-start gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors">
                         <div className={`p-2 rounded-lg ${
-                          activity.type === "view" ? "bg-blue-100" :
-                          activity.type === "inquiry" ? "bg-green-100" :
-                          activity.type === "booking" ? "bg-purple-100" :
-                          "bg-yellow-100"
+                          activity.type === "booking" ? "bg-purple-100" : "bg-blue-100"
                         }`}>
-                          {activity.type === "view" && <Eye className="size-4 text-blue-600" />}
-                          {activity.type === "inquiry" && <MessageSquare className="size-4 text-green-600" />}
                           {activity.type === "booking" && <Calendar className="size-4 text-purple-600" />}
-                          {activity.type === "review" && <Star className="size-4 text-yellow-600" />}
+                          {activity.type === "property" && <Building2 className="size-4 text-blue-600" />}
                         </div>
                         <div className="flex-1">
                           <div className="font-medium text-[#0F172A]">{activity.user}</div>
@@ -606,11 +697,9 @@ export default function AdminDashboard() {
                             {activity.time}
                           </div>
                         </div>
-                        {activity.rating && (
-                          <div className="flex items-center gap-1">
-                            {[...Array(activity.rating)].map((_, i) => (
-                              <Star key={i} className="size-3 fill-yellow-400 text-yellow-400" />
-                            ))}
+                        {"status" in activity && activity.status && (
+                          <div className="text-xs font-medium text-slate-500 capitalize">
+                            {activity.status}
                           </div>
                         )}
                       </div>
@@ -644,18 +733,18 @@ export default function AdminDashboard() {
                           <div className="font-semibold text-[#0F172A]">{property.name}</div>
                           <div className="flex items-center gap-4 mt-1 text-sm text-slate-600">
                             <span className="flex items-center gap-1">
-                              <Eye className="size-3" />
-                              {property.views}
-                            </span>
-                            <span className="flex items-center gap-1">
                               <Users className="size-3" />
                               {property.leads}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="size-3" />
+                              {property.confirmed}
                             </span>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="font-bold text-green-600">{property.revenue}</div>
-                          <div className="text-xs text-slate-500">Receita</div>
+                          <div className="text-xs text-slate-500">Preço base</div>
                         </div>
                       </div>
                     ))}
@@ -725,9 +814,9 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="py-4 px-4">
-                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${getPropertyStatusStyles(property.status)}`}>
                               <CheckCircle2 className="size-3" />
-                              Ativo
+                              {property.status}
                             </span>
                           </td>
                           <td className="py-4 px-4">
@@ -741,10 +830,10 @@ export default function AdminDashboard() {
                               <button className="p-2 hover:bg-blue-50 rounded-lg transition-colors">
                                 <Eye className="size-4 text-blue-600" />
                               </button>
-                              <button className="p-2 hover:bg-green-50 rounded-lg transition-colors">
+                              <button onClick={() => handleEditProperty(property)} className="p-2 hover:bg-green-50 rounded-lg transition-colors">
                                 <Edit className="size-4 text-green-600" />
                               </button>
-                              <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                              <button onClick={() => handleDeleteProperty(property.id)} className="p-2 hover:bg-red-50 rounded-lg transition-colors">
                                 <Trash2 className="size-4 text-red-600" />
                               </button>
                             </div>

@@ -3,6 +3,7 @@ import { properties as seedProperties } from "../app/data/properties";
 
 const STORAGE_KEY = "grupo-sp-properties";
 const STORAGE_EVENT = "grupo-sp-properties:updated";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80";
 
@@ -40,7 +41,6 @@ const dispatchPropertiesEvent = () => {
 };
 
 const normalizeProperty = (property: Partial<Property>, index = 0): Property => {
-  // Mantem compatibilidade entre os dados antigos do site e os novos cadastros do painel.
   const mainImage = property.image || property.images?.[0] || DEFAULT_IMAGE;
   const size = Number(property.size ?? property.area ?? 60);
   const capacity = Number(property.capacity ?? property.bedrooms ?? 4);
@@ -91,13 +91,15 @@ const defaultProperties: Property[] = seedProperties.map((property, index) =>
   ),
 );
 
-const savePropertiesToStorage = (properties: Property[]) => {
+const cacheProperties = (properties: Property[], shouldDispatch = false) => {
   if (!isBrowser()) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(properties));
-  dispatchPropertiesEvent();
+  if (shouldDispatch) {
+    dispatchPropertiesEvent();
+  }
 };
 
-const loadPropertiesFromStorage = (): Property[] => {
+const loadCachedProperties = (): Property[] => {
   if (!isBrowser()) {
     return defaultProperties;
   }
@@ -105,7 +107,7 @@ const loadPropertiesFromStorage = (): Property[] => {
   const storedProperties = localStorage.getItem(STORAGE_KEY);
 
   if (!storedProperties) {
-    savePropertiesToStorage(defaultProperties);
+    cacheProperties(defaultProperties);
     return defaultProperties;
   }
 
@@ -113,45 +115,114 @@ const loadPropertiesFromStorage = (): Property[] => {
     const parsedProperties = JSON.parse(storedProperties) as Partial<Property>[];
     return parsedProperties.map((property, index) => normalizeProperty(property, index));
   } catch {
-    savePropertiesToStorage(defaultProperties);
+    cacheProperties(defaultProperties);
     return defaultProperties;
   }
 };
 
+const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Erro ao acessar ${path}`);
+  }
+
+  return (await response.json()) as T;
+};
+
 export const renderizarImoveis = (): Property[] =>
-  loadPropertiesFromStorage().sort((first, second) =>
+  loadCachedProperties().sort((first, second) =>
     (second.created_at ?? "").localeCompare(first.created_at ?? ""),
   );
 
-export const salvarImovel = (property: PropertyDraft): Property => {
-  // Centraliza a persistencia para que painel, home e busca usem a mesma base.
-  const currentProperties = renderizarImoveis();
-  const now = new Date().toISOString();
-  const newProperty = normalizeProperty(
-    {
-      ...property,
-      id: property.id ?? crypto.randomUUID(),
-      image: property.image || property.images?.[0] || DEFAULT_IMAGE,
-      images:
-        property.images?.filter((image) => image.trim())?.length
-          ? property.images.filter((image) => image.trim())
-          : [property.image || DEFAULT_IMAGE],
-      created_at: property.created_at ?? now,
-      updated_at: now,
-    },
-    currentProperties.length,
-  );
+export const getAllProperties = async (): Promise<Property[]> => {
+  try {
+    const properties = (await apiRequest<Partial<Property>[]>("/api/properties")).map((property, index) =>
+      normalizeProperty(property, index),
+    );
+    cacheProperties(properties);
+    return properties;
+  } catch {
+    return renderizarImoveis();
+  }
+};
 
-  savePropertiesToStorage([newProperty, ...currentProperties]);
-  return newProperty;
+export const getPropertyById = async (id: string): Promise<Property | undefined> => {
+  try {
+    const property = await apiRequest<Partial<Property>>(`/api/properties/${id}`);
+    return normalizeProperty(property);
+  } catch {
+    return renderizarImoveis().find((property) => property.id === id);
+  }
+};
+
+export const addProperty = async (property: Omit<Property, "id" | "created_at" | "updated_at">): Promise<string> => {
+  const payload = normalizeProperty(property);
+
+  try {
+    const created = normalizeProperty(
+      await apiRequest<Partial<Property>>("/api/properties", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    );
+    const current = renderizarImoveis().filter((item) => item.id !== created.id);
+    cacheProperties([created, ...current], true);
+    return created.id;
+  } catch {
+    const fallbackCreated = normalizeProperty({ ...payload, id: crypto.randomUUID() });
+    cacheProperties([fallbackCreated, ...renderizarImoveis()], true);
+    return fallbackCreated.id;
+  }
+};
+
+export const updateProperty = async (id: string, updates: Partial<Property>): Promise<void> => {
+  try {
+    const updated = normalizeProperty(
+      await apiRequest<Partial<Property>>(`/api/properties/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ ...updates, id }),
+      }),
+    );
+    const next = renderizarImoveis().map((property) => (property.id === id ? updated : property));
+    cacheProperties(next, true);
+  } catch {
+    const updatedProperties = renderizarImoveis().map((property) =>
+      property.id === id
+        ? normalizeProperty({
+            ...property,
+            ...updates,
+            id,
+            updated_at: new Date().toISOString(),
+          })
+        : property,
+    );
+    cacheProperties(updatedProperties, true);
+  }
+};
+
+export const deleteProperty = async (id: string): Promise<void> => {
+  try {
+    await apiRequest(`/api/properties/${id}`, { method: "DELETE" });
+  } finally {
+    const filteredProperties = renderizarImoveis().filter((property) => property.id !== id);
+    cacheProperties(filteredProperties, true);
+  }
 };
 
 export const useProperties = () => {
   const [properties, setProperties] = useState<Property[]>(() => renderizarImoveis());
 
   useEffect(() => {
-    const syncProperties = () => {
-      setProperties(renderizarImoveis());
+    const syncProperties = async () => {
+      setProperties(await getAllProperties());
     };
 
     syncProperties();
@@ -167,35 +238,6 @@ export const useProperties = () => {
   return properties;
 };
 
-export const getAllProperties = async (): Promise<Property[]> => renderizarImoveis();
-
-export const getPropertyById = async (id: string): Promise<Property | undefined> =>
-  renderizarImoveis().find((property) => property.id === id);
-
-export const addProperty = async (
-  property: Omit<Property, "id" | "created_at" | "updated_at">,
-): Promise<string> => salvarImovel(property).id;
-
-export const updateProperty = async (id: string, updates: Partial<Property>): Promise<void> => {
-  const updatedProperties = renderizarImoveis().map((property) =>
-    property.id === id
-      ? normalizeProperty({
-          ...property,
-          ...updates,
-          id,
-          updated_at: new Date().toISOString(),
-        })
-      : property,
-  );
-
-  savePropertiesToStorage(updatedProperties);
-};
-
-export const deleteProperty = async (id: string): Promise<void> => {
-  const filteredProperties = renderizarImoveis().filter((property) => property.id !== id);
-  savePropertiesToStorage(filteredProperties);
-};
-
 export const initializeDatabase = async (): Promise<void> => {
-  renderizarImoveis();
+  await getAllProperties();
 };
