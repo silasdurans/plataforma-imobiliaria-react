@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, X, Send, Mic, Calendar, MapPin, DollarSign, Building2, Users, TrendingUp, Clock, Zap, CheckCircle2, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useProperties } from "../../data/properties";
-import { addSchedule } from "../../data/schedules";
+import { addSchedule, getSchedules } from "../../data/schedules";
 import { getClientSession } from "../lib/clientSession";
 
 interface Message {
@@ -28,6 +28,17 @@ interface PendingSchedule {
   propertyTitle: string;
 }
 
+const AVAILABLE_HOURS = ["09:00", "11:00", "14:00", "16:00"];
+
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const formatDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 export function AIAgent() {
   const properties = useProperties();
   const [isOpen, setIsOpen] = useState(false);
@@ -49,6 +60,7 @@ export function AIAgent() {
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [pendingSchedule, setPendingSchedule] = useState<PendingSchedule | null>(null);
+  const [lastResults, setLastResults] = useState<PropertyResult[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -84,6 +96,11 @@ export function AIAgent() {
 
     const hours = Number(timeMatch[1]);
     const minutes = Number(timeMatch[2]);
+
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours > 23 || minutes > 59) {
+      return null;
+    }
+
     const time = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 
     const scheduledDate = new Date(now);
@@ -114,11 +131,112 @@ export function AIAgent() {
       }
     }
 
+    if (scheduledDate < now || scheduledDate.getDay() === 0 || scheduledDate.getDay() === 6) {
+      return null;
+    }
+
+    if (!AVAILABLE_HOURS.includes(time)) {
+      return null;
+    }
+
     return {
-      date: `${scheduledDate.getFullYear()}-${String(scheduledDate.getMonth() + 1).padStart(2, "0")}-${String(scheduledDate.getDate()).padStart(2, "0")}`,
+      date: formatDateKey(scheduledDate),
       time,
       displayDate: scheduledDate.toLocaleDateString("pt-BR"),
     };
+  };
+
+  const getAvailableTimesForDate = (propertyTitle: string, date: string) => {
+    const bookedTimes = getSchedules()
+      .filter(
+        (schedule) =>
+          schedule.propertyTitle === propertyTitle &&
+          schedule.date === date &&
+          schedule.status !== "cancelado",
+      )
+      .map((schedule) => schedule.time);
+
+    return AVAILABLE_HOURS.filter((hour) => !bookedTimes.includes(hour));
+  };
+
+  const findPropertyForScheduling = (text: string) => {
+    const normalizedText = normalizeText(text);
+
+    const exactResultMatch = lastResults.find((property) => normalizedText.includes(normalizeText(property.title)));
+    if (exactResultMatch) {
+      return { propertyId: exactResultMatch.id, propertyTitle: exactResultMatch.title };
+    }
+
+    if (lastResults.length === 1) {
+      return { propertyId: lastResults[0].id, propertyTitle: lastResults[0].title };
+    }
+
+    const exactPropertyMatch = properties.find((property) => normalizedText.includes(normalizeText(property.title)));
+    if (exactPropertyMatch) {
+      return { propertyId: exactPropertyMatch.id, propertyTitle: exactPropertyMatch.title };
+    }
+
+    return null;
+  };
+
+  const requestScheduleSelection = () => {
+    appendAgentMessage({
+      content:
+        lastResults.length > 1
+          ? "Posso fazer o agendamento, mas antes preciso saber qual imóvel você quer visitar. Clique em “Agendar visita real” em uma das opções acima ou envie o nome do imóvel."
+          : "Posso fazer o agendamento, mas preciso que você me diga qual imóvel deseja visitar.",
+      suggestions: lastResults.slice(0, 3).map((property) => property.title),
+    });
+  };
+
+  const completeSchedule = async (
+    property: PendingSchedule,
+    parsed: NonNullable<ReturnType<typeof parseScheduleRequest>>,
+  ) => {
+    const availableTimes = getAvailableTimesForDate(property.propertyTitle, parsed.date);
+
+    if (!availableTimes.includes(parsed.time)) {
+      appendAgentMessage({
+        content:
+          availableTimes.length > 0
+            ? `Esse horário não está disponível para "${property.propertyTitle}" em ${parsed.displayDate}. Posso te oferecer ${availableTimes.join(", ")}.`
+            : `Não há horários livres para "${property.propertyTitle}" em ${parsed.displayDate}. Escolha outro dia útil.`,
+        suggestions:
+          availableTimes.length > 0
+            ? availableTimes.map((hour) => `${parsed.displayDate} às ${hour}`)
+            : ["Amanhã às 09:00", "Amanhã às 14:00", "Sexta às 10:00"],
+      });
+      return false;
+    }
+
+    const session = getClientSession();
+    if (!session) {
+      appendAgentMessage({
+        content: "Sua sessão de cliente não está ativa. Faça login novamente para concluir o agendamento.",
+        suggestions: ["Ir para login"],
+      });
+      setPendingSchedule(null);
+      setTimeout(() => navigate("/cliente/login"), 900);
+      return false;
+    }
+
+    await addSchedule({
+      propertyTitle: property.propertyTitle,
+      clientName: session.name,
+      clientEmail: session.email,
+      clientId: session.id,
+      date: parsed.date,
+      time: parsed.time,
+      status: "agendado",
+      notes: `Agendamento criado via chatbot inteligente para ${property.propertyTitle}.`,
+    });
+
+    appendAgentMessage({
+      content: `Agendamento realizado com sucesso. Visita marcada para ${property.propertyTitle} em ${parsed.displayDate} às ${parsed.time}. O painel administrativo já recebeu esse agendamento.`,
+      suggestions: ["Ver imóvel", "Agendar outra visita", "Mostrar mais salas"],
+    });
+    setPendingSchedule(null);
+    return true;
   };
 
   const startScheduleFlow = (property: PendingSchedule) => {
@@ -205,6 +323,7 @@ export function AIAgent() {
     if (needsSearch && results.length > 0) {
       responseContent = `Encontrei ${filterProperties.length} opção(ões) que podem ser interessantes para você. Veja abaixo algumas sugestões de imóveis com base na sua busca.`;
       responseResults = results;
+      setLastResults(results);
       suggestions = [
         "Mostrar mais resultados",
         "Agendar visita",
@@ -213,6 +332,7 @@ export function AIAgent() {
       ];
     } else if (needsSearch && results.length === 0 && (selectedType || selectedLocation || budget || capacity)) {
       responseContent = `Ainda não encontrei imóveis que batem com esses critérios exatos. Posso ampliar a busca? Tente usar outras regiões ou aumentar o orçamento.`;
+      setLastResults([]);
       suggestions = [
         "Ver opções sem filtro de preço",
         "Mostrar todas as salas",
@@ -220,13 +340,29 @@ export function AIAgent() {
         "Agendar uma visita"
       ];
     } else if (intentions.schedule.some(word => lowerMessage.includes(word))) {
-      responseContent = `📅 Certo! Posso ajudar a agendar sua visita. Para isso, diga quando você gostaria de visitar o imóvel e qual horário funciona melhor para você.`;
-      suggestions = [
-        "Amanhã às 09:00",
-        "Sexta às 14:00",
-        "Agendamento presencial",
-        "Agendamento virtual"
-      ];
+      const selectedProperty = findPropertyForScheduling(userMessage);
+
+      if (selectedProperty) {
+        const session = getClientSession();
+        if (!session) {
+          responseContent = "Para concluir um agendamento real, faça login como cliente primeiro. Vou te levar para a tela de login.";
+          suggestions = ["Ir para login", "Continuar pesquisando"];
+          setTimeout(() => navigate("/cliente/login"), 900);
+        } else {
+          setPendingSchedule(selectedProperty);
+          responseContent = `Perfeito. Vamos agendar uma visita real para "${selectedProperty.propertyTitle}". Envie a data e o horário em um dia útil, usando um destes horários: ${AVAILABLE_HOURS.join(", ")}. Exemplo: "amanhã às 09:00" ou "25/04 às 14:00".`;
+          suggestions = ["Amanhã às 09:00", "Amanhã às 14:00", "Sexta às 11:00", "25/04 às 16:00"];
+        }
+      } else {
+        responseContent =
+          lastResults.length > 1
+            ? "📅 Posso agendar sua visita, mas primeiro preciso saber qual imóvel você quer visitar."
+            : "📅 Posso ajudar com o agendamento. Me diga o nome do imóvel para eu preparar a visita.";
+        suggestions =
+          lastResults.length > 0
+            ? lastResults.slice(0, 3).map((property) => property.title)
+            : ["Quero visitar um coworking no centro", "Mostrar salas disponíveis"];
+      }
     } else if (intentions.price.some(word => lowerMessage.includes(word))) {
       responseContent = `💰 Entendi! A São Paulo Participações oferece opções em diferentes faixas de preço. Você pode me dizer um valor máximo e eu busco imóveis que cabem no seu orçamento.`;
       suggestions = [
@@ -288,46 +424,18 @@ export function AIAgent() {
     setIsTyping(true);
 
     if (pendingSchedule) {
-      setTimeout(() => {
+      setTimeout(async () => {
         const parsed = parseScheduleRequest(currentInput);
 
         if (!parsed) {
           appendAgentMessage({
-            content: `Não consegui entender a data e o horário para "${pendingSchedule.propertyTitle}". Tente algo como "amanhã às 09:00" ou "25/04 às 14:00".`,
-            suggestions: ["Amanhã às 09:00", "Sexta às 14:00", "25/04 às 10:00"],
+            content: `Não consegui validar a data e o horário para "${pendingSchedule.propertyTitle}". Use um dia útil futuro e um destes horários: ${AVAILABLE_HOURS.join(", ")}. Exemplo: "amanhã às 09:00" ou "25/04 às 14:00".`,
+            suggestions: ["Amanhã às 09:00", "Amanhã às 14:00", "25/04 às 16:00"],
           });
           setIsTyping(false);
           return;
         }
-
-        const session = getClientSession();
-        if (!session) {
-          appendAgentMessage({
-            content: "Sua sessão de cliente não está ativa. Faça login novamente para concluir o agendamento.",
-            suggestions: ["Ir para login"],
-          });
-          setPendingSchedule(null);
-          setIsTyping(false);
-          setTimeout(() => navigate("/cliente/login"), 900);
-          return;
-        }
-
-        addSchedule({
-          propertyTitle: pendingSchedule.propertyTitle,
-          clientName: session.name,
-          clientEmail: session.email,
-          clientId: session.id,
-          date: parsed.date,
-          time: parsed.time,
-          status: "agendado",
-          notes: `Agendamento criado via chatbot inteligente para ${pendingSchedule.propertyTitle}.`,
-        });
-
-        appendAgentMessage({
-          content: `Agendamento realizado com sucesso. Visita marcada para ${pendingSchedule.propertyTitle} em ${parsed.displayDate} às ${parsed.time}. O painel administrativo já recebeu esse agendamento.`,
-          suggestions: ["Ver imóvel", "Agendar outra visita", "Mostrar mais salas"],
-        });
-        setPendingSchedule(null);
+        await completeSchedule(pendingSchedule, parsed);
         setIsTyping(false);
       }, 900);
 
@@ -363,43 +471,33 @@ export function AIAgent() {
       if (pendingSchedule) {
         const parsed = parseScheduleRequest(suggestion);
 
-        setTimeout(() => {
+        setTimeout(async () => {
           if (!parsed) {
             appendAgentMessage({
-              content: "Não consegui validar esse horário. Escolha outra sugestão ou digite a data e hora manualmente.",
-              suggestions: ["Amanhã às 09:00", "Sexta às 14:00"],
+              content: `Não consegui validar esse horário. Escolha um dia útil futuro usando um destes horários: ${AVAILABLE_HOURS.join(", ")}.`,
+              suggestions: ["Amanhã às 09:00", "Amanhã às 14:00"],
             });
             setIsTyping(false);
             return;
           }
+          await completeSchedule(pendingSchedule, parsed);
+          setIsTyping(false);
+        }, 700);
 
-          const session = getClientSession();
-          if (!session) {
-            appendAgentMessage({
-              content: "Faça login como cliente para concluir o agendamento.",
-              suggestions: ["Ir para login"],
-            });
-            setPendingSchedule(null);
+        return;
+      }
+
+      if (lastResults.some((property) => property.title === suggestion) || properties.some((property) => property.title === suggestion)) {
+        const selectedProperty = findPropertyForScheduling(suggestion);
+
+        setTimeout(() => {
+          if (!selectedProperty) {
+            requestScheduleSelection();
             setIsTyping(false);
             return;
           }
 
-          addSchedule({
-            propertyTitle: pendingSchedule.propertyTitle,
-            clientName: session.name,
-            clientEmail: session.email,
-            clientId: session.id,
-            date: parsed.date,
-            time: parsed.time,
-            status: "agendado",
-            notes: `Agendamento criado via chatbot inteligente para ${pendingSchedule.propertyTitle}.`,
-          });
-
-          appendAgentMessage({
-            content: `Agendamento realizado com sucesso. Visita marcada para ${pendingSchedule.propertyTitle} em ${parsed.displayDate} às ${parsed.time}.`,
-            suggestions: ["Ver imóvel", "Mostrar mais salas"],
-          });
-          setPendingSchedule(null);
+          startScheduleFlow(selectedProperty);
           setIsTyping(false);
         }, 700);
 

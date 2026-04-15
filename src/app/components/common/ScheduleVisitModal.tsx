@@ -95,7 +95,7 @@ export function ScheduleVisitModal({ propertyTitle }: ScheduleVisitModalProps) {
     setConfirmed(false);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedDate || !selectedTime) return;
 
     const sessionRaw = localStorage.getItem("grupo-sp-client-session");
@@ -109,7 +109,7 @@ export function ScheduleVisitModal({ propertyTitle }: ScheduleVisitModalProps) {
     try {
       const session = JSON.parse(sessionRaw) as { id: string; name: string; email: string };
 
-      addSchedule({
+      await addSchedule({
         propertyTitle,
         clientName: session.name,
         clientEmail: session.email,

@@ -80,8 +80,7 @@ export default function Home() {
     navigate(`/resultados?q=${encodeURIComponent(trimmedQuery)}`);
   };
 
-  const featuredPropertyIds = ["4", "5", "6", "7", "8", "1"];
-  const recentProperties = properties.filter((property) => featuredPropertyIds.includes(property.id));
+  const recentProperties = properties.slice(0, 6);
 
   return (
     <div className="min-h-screen bg-white">

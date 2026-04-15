@@ -15,225 +15,72 @@ export interface Property {
   lng: number;
 }
 
-export const properties: Property[] = [
-  {
-    id: "1",
-    title: "Escritório Moderno Centro São Luís",
-    type: "Escritório",
-    price: 1800,
-    location: "Centro, São Luís - MA",
-    size: 45,
-    capacity: 8,
-    rating: 4.8,
-    image: "https://images.unsplash.com/photo-1758630737900-a28682c5aa69?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjb21tZXJjaWFsJTIwb2ZmaWNlJTIwc3BhY2V8ZW58MXx8fHwxNzczNjY4Njc0fDA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1758630737900-a28682c5aa69?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjb21tZXJjaWFsJTIwb2ZmaWNlJTIwc3BhY2V8ZW58MXx8fHwxNzczNjY4Njc0fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "https://images.unsplash.com/photo-1559310415-1e164ccd653a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb3dvcmtpbmclMjBzcGFjZSUyMGludGVyaW9yfGVufDF8fHx8MTc3MzYxMzQ4MHww&ixlib=rb-4.1.0&q=80&w=1080",
-      "https://images.unsplash.com/photo-1637665662134-db459c1bbb46?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWV0aW5nJTIwcm9vbSUyMG9mZmljZXxlbnwxfHx8fDE3NzM2NDk1ODR8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Escritório completamente mobiliado no coração de São Luís, ideal para startups e pequenas empresas. Localização privilegiada com fácil acesso a transporte público e área comercial.",
-    features: [
-      "Wi-Fi de alta velocidade",
-      "Mobiliado",
-      "Ar condicionado",
-      "Recepção compartilhada",
-      "Sala de reunião",
-      "Copa equipada",
-      "Estacionamento disponível",
-      "Segurança 24h"
-    ],
-    lat: -2.5297,
-    lng: -44.3028
-  },
-  {
-    id: "2",
-    title: "Coworking Premium Renascença",
-    type: "Coworking",
-    price: 850,
-    location: "Renascença, São Luís - MA",
-    size: 20,
-    capacity: 4,
-    rating: 4.9,
-    image: "https://images.unsplash.com/photo-1559310415-1e164ccd653a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb3dvcmtpbmclMjBzcGFjZSUyMGludGVyaW9yfGVufDF8fHx8MTc3MzYxMzQ4MHww&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1559310415-1e164ccd653a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb3dvcmtpbmclMjBzcGFjZSUyMGludGVyaW9yfGVufDF8fHx8MTc3MzYxMzQ4MHww&ixlib=rb-4.1.0&q=80&w=1080",
-      "https://images.unsplash.com/photo-1576073460124-e073bb8d87f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMHdvcmtzcGFjZXxlbnwxfHx8fDE3NzM2Njg2NzV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Espaço de coworking moderno e inspirador, perfeito para profissionais autônomos e equipes pequenas. Ambiente colaborativo com infraestrutura completa.",
-    features: [
-      "Wi-Fi Gigabit",
-      "Café e água inclusos",
-      "Impressora e scanner",
-      "Armário individual",
-      "Sala de reunião (agendamento)",
-      "Ambiente climatizado",
-      "Acesso 24/7",
-      "Comunidade ativa"
-    ],
-    lat: -2.5187,
-    lng: -44.2739
-  },
-  {
-    id: "3",
-    title: "Loja Comercial Cohama",
-    type: "Loja",
-    price: 3500,
-    location: "Cohama, São Luís - MA",
-    size: 80,
-    capacity: 15,
-    rating: 4.6,
-    image: "https://images.unsplash.com/photo-1761333477936-56fbc7851c65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21tZXJjaWFsJTIwcmV0YWlsJTIwc3RvcmV8ZW58MXx8fHwxNzczNjY4Njc0fDA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1761333477936-56fbc7851c65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21tZXJjaWFsJTIwcmV0YWlsJTIwc3RvcmV8ZW58MXx8fHwxNzczNjY4Njc0fDA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Loja ampla em uma das regiões mais movimentadas de São Luís. Excelente visibilidade e fluxo de pessoas. Ideal para varejo.",
-    features: [
-      "Vitrine ampla",
-      "Banheiro privativo",
-      "Depósito",
-      "Ar condicionado split",
-      "3 vagas de estacionamento",
-      "Portão de enrolar",
-      "Ponto de água e esgoto",
-      "Instalação elétrica 220V"
-    ],
-    lat: -2.5654,
-    lng: -44.2493
-  },
-  {
-    id: "4",
-    title: "Sala Comercial Calhau",
-    type: "Sala Comercial",
-    price: 1200,
-    location: "Calhau, São Luís - MA",
-    size: 35,
-    capacity: 6,
-    rating: 4.7,
-    image: "https://images.unsplash.com/photo-1637665662134-db459c1bbb46?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWV0aW5nJTIwcm9vbSUyMG9mZmljZXxlbnwxfHx8fDE3NzM2NDk1ODR8MA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1637665662134-db459c1bbb46?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWV0aW5nJTIwcm9vbSUyMG9mZmljZXxlbnwxfHx8fDE3NzM2NDk1ODR8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Sala comercial pronta para uso, em edifício corporativo moderno. Ótima localização próxima à praia.",
-    features: [
-      "Internet incluída",
-      "2 banheiros no andar",
-      "Copa compartilhada",
-      "Elevador",
-      "Portaria 24h",
-      "Gerador",
-      "2 vagas",
-      "CFTV"
-    ],
-    lat: -2.4817,
-    lng: -44.2949
-  },
-  {
-    id: "5",
-    title: "Escritório Executivo Ponta d'Areia",
-    type: "Escritório",
-    price: 2500,
-    location: "Ponta d'Areia, São Luís - MA",
-    size: 60,
-    capacity: 10,
-    rating: 4.9,
-    image: "https://images.unsplash.com/photo-1576073460124-e073bb8d87f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMHdvcmtzcGFjZXxlbnwxfHx8fDE3NzM2Njg2NzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1576073460124-e073bb8d87f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMHdvcmtzcGFjZXxlbnwxfHx8fDE3NzM2Njg2NzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "https://images.unsplash.com/photo-1711720743865-10787dd6934a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBvZmZpY2UlMjBidWlsZGluZ3xlbnwxfHx8fDE3NzM2NDYzNDV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Escritório de alto padrão em edifício premium. Vista panorâmica, acabamento sofisticado e localização nobre.",
-    features: [
-      "Mobiliado de luxo",
-      "Wi-Fi empresarial",
-      "Sala de reunião privativa",
-      "Banheiro privativo",
-      "Ar condicionado central",
-      "4 vagas cobertas",
-      "Concierge",
-      "Heliponto"
-    ],
-    lat: -2.4956,
-    lng: -44.2828
-  },
-  {
-    id: "6",
-    title: "Espaço Compartilhado São Francisco",
-    type: "Coworking",
-    price: 650,
-    location: "São Francisco, São Luís - MA",
-    size: 15,
-    capacity: 3,
-    rating: 4.5,
-    image: "https://images.unsplash.com/flagged/photo-1576485424072-e585a98df56e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaGFyZWQlMjBvZmZpY2UlMjBzcGFjZXxlbnwxfHx8fDE3NzM2Njg2NzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/flagged/photo-1576485424072-e585a98df56e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaGFyZWQlMjBvZmZpY2UlMjBzcGFjZXxlbnwxfHx8fDE3NzM2Njg2NzV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Ambiente descontraído e produtivo para freelancers e pequenos times. Ótimo custo-benefício.",
-    features: [
-      "Mesa fixa",
-      "Internet rápida",
-      "Café livre",
-      "Ar condicionado",
-      "Recepção",
-      "Armário com chave",
-      "Horário comercial",
-      "Eventos networking"
-    ],
-    lat: -2.5389,
-    lng: -44.2654
-  },
-  {
-    id: "7",
-    title: "Sala Premium Jaracaty",
-    type: "Sala Comercial",
-    price: 1600,
-    location: "Jaracaty, São Luís - MA",
-    size: 50,
-    capacity: 8,
-    rating: 4.8,
-    image: "https://images.unsplash.com/photo-1771530789155-b1f03fbf82b5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21tZXJjaWFsJTIwcHJvcGVydHklMjBpbnRlcmlvcnxlbnwxfHx8fDE3NzM2Njg2NzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1771530789155-b1f03fbf82b5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21tZXJjaWFsJTIwcHJvcGVydHklMjBpbnRlcmlvcnxlbnwxfHx8fDE3NzM2Njg2NzV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Sala comercial em área nobre, perfeita para consultórios e escritórios profissionais.",
-    features: [
-      "Piso elevado",
-      "Forro de gesso",
-      "Iluminação LED",
-      "Banheiro no andar",
-      "Recepção comum",
-      "Estacionamento rotativo",
-      "Segurança",
-      "Próximo a shopping"
-    ],
-    lat: -2.5034,
-    lng: -44.2566
-  },
-  {
-    id: "8",
-    title: "Loja Estratégica Centro Histórico",
-    type: "Loja",
-    price: 2800,
-    location: "Centro Histórico, São Luís - MA",
-    size: 65,
-    capacity: 12,
-    rating: 4.4,
-    image: "https://images.unsplash.com/photo-1758630737900-a28682c5aa69?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjb21tZXJjaWFsJTIwb2ZmaWNlJTIwc3BhY2V8ZW58MXx8fHwxNzczNjY4Njc0fDA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1758630737900-a28682c5aa69?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjb21tZXJjaWFsJTIwb2ZmaWNlJTIwc3BhY2V8ZW58MXx8fHwxNzczNjY4Njc0fDA&ixlib=rb-4.1.0&q=80&w=1080"
-    ],
-    description: "Ponto comercial em área histórica e turística, ideal para lojas de artesanato, cafeterias e comércio cultural.",
-    features: [
-      "Fachada histórica",
-      "Pé-direito alto",
-      "Mezanino",
-      "Ventilação natural",
-      "Restaurado",
-      "Grande circulação",
-      "Patrimônio cultural",
-      "Próximo a pontos turísticos"
-    ],
-    lat: -2.5297,
-    lng: -44.3028
-  }
+const officeImages = [
+  "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1497366412874-3415097a27e7?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1497215842964-222b430dc094?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?auto=format&fit=crop&w=1200&q=80",
 ];
+
+const featureSets = [
+  ["Wi-Fi empresarial", "Portaria 24h", "Ar condicionado central", "2 vagas", "Sala de reunião", "CFTV"],
+  ["Internet incluída", "Copa compartilhada", "Recepção premium", "Elevador", "Gerador", "Estacionamento rotativo"],
+  ["Mobiliado", "Iluminação LED", "Piso em porcelanato", "Banheiro privativo", "Auditório no edifício", "Controle de acesso"],
+  ["Wi-Fi Gigabit", "Sala de reunião privativa", "Café livre", "Ar condicionado split", "3 vagas", "Hall corporativo"],
+  ["Recepção compartilhada", "Segurança 24h", "Forro modular", "Vista para o mar", "Banheiro no andar", "Estacionamento"],
+];
+
+const propertiesSeed = [
+  { id: "1", title: "Sala Corporativa Atlante", location: "Ponta d'Areia, São Luís - MA", price: 4200, size: 52, capacity: 8, rating: 4.9, lat: -2.4908, lng: -44.2938 },
+  { id: "2", title: "Sala Prime Renascença One", location: "Renascença, São Luís - MA", price: 3900, size: 48, capacity: 7, rating: 4.8, lat: -2.5042, lng: -44.2925 },
+  { id: "3", title: "Sala Vista Mar Calhau", location: "Calhau, São Luís - MA", price: 4600, size: 58, capacity: 9, rating: 4.8, lat: -2.4862, lng: -44.2859 },
+  { id: "4", title: "Sala Boutique Península", location: "Península da Ponta d'Areia, São Luís - MA", price: 6100, size: 63, capacity: 10, rating: 4.9, lat: -2.4926, lng: -44.2898 },
+  { id: "5", title: "Sala Executiva São Marcos", location: "São Marcos, São Luís - MA", price: 3400, size: 44, capacity: 6, rating: 4.7, lat: -2.4944, lng: -44.2834 },
+  { id: "6", title: "Sala Médica Jardim Renascença", location: "Jardim Renascença, São Luís - MA", price: 3700, size: 46, capacity: 7, rating: 4.8, lat: -2.5005, lng: -44.2891 },
+  { id: "7", title: "Sala Empresarial Cohafuma Center", location: "Cohafuma, São Luís - MA", price: 3200, size: 40, capacity: 6, rating: 4.7, lat: -2.5171, lng: -44.2647 },
+  { id: "8", title: "Sala Heritage Quintas", location: "Quintas do Calhau, São Luís - MA", price: 4900, size: 62, capacity: 10, rating: 4.8, lat: -2.4682, lng: -44.2562 },
+  { id: "9", title: "Sala Strategic Holandeses", location: "Calhau, São Luís - MA", price: 4300, size: 54, capacity: 8, rating: 4.7, lat: -2.4783, lng: -44.2664 },
+  { id: "10", title: "Sala Nobile Renascença II", location: "Renascença II, São Luís - MA", price: 3600, size: 43, capacity: 6, rating: 4.7, lat: -2.5061, lng: -44.2875 },
+  { id: "11", title: "Sala Prime Olho d'Água", location: "Olho d'Água, São Luís - MA", price: 4100, size: 50, capacity: 8, rating: 4.8, lat: -2.4635, lng: -44.2458 },
+  { id: "12", title: "Sala Corporate Jaracaty", location: "Jaracaty, São Luís - MA", price: 3000, size: 38, capacity: 5, rating: 4.6, lat: -2.5018, lng: -44.2752 },
+  { id: "13", title: "Sala Premium Ponta do Farol", location: "Ponta do Farol, São Luís - MA", price: 5200, size: 60, capacity: 10, rating: 4.9, lat: -2.4881, lng: -44.2872 },
+  { id: "14", title: "Sala Select São Francisco", location: "São Francisco, São Luís - MA", price: 2800, size: 36, capacity: 5, rating: 4.6, lat: -2.5156, lng: -44.2923 },
+  { id: "15", title: "Sala Garden Eldorado", location: "Jardim Eldorado, São Luís - MA", price: 3350, size: 41, capacity: 6, rating: 4.7, lat: -2.5114, lng: -44.2682 },
+  { id: "16", title: "Sala Imperial Calhau Tower", location: "Calhau, São Luís - MA", price: 5800, size: 68, capacity: 11, rating: 4.9, lat: -2.4821, lng: -44.2817 },
+  { id: "17", title: "Sala Costa Atlântica", location: "Quintas do Calhau, São Luís - MA", price: 4700, size: 56, capacity: 9, rating: 4.8, lat: -2.4705, lng: -44.2504 },
+  { id: "18", title: "Sala Smart Península Office", location: "Península da Ponta d'Areia, São Luís - MA", price: 6400, size: 70, capacity: 12, rating: 5.0, lat: -2.4917, lng: -44.291 },
+  { id: "19", title: "Sala Office Center Renascença", location: "Renascença, São Luís - MA", price: 3550, size: 42, capacity: 6, rating: 4.7, lat: -2.5031, lng: -44.2909 },
+  { id: "20", title: "Sala Blue Tower Cohafuma", location: "Cohafuma, São Luís - MA", price: 3450, size: 44, capacity: 6, rating: 4.7, lat: -2.5158, lng: -44.2611 },
+  { id: "21", title: "Sala Brisa Mar Olho d'Água", location: "Olho d'Água, São Luís - MA", price: 3950, size: 49, capacity: 7, rating: 4.8, lat: -2.4588, lng: -44.2423 },
+  { id: "22", title: "Sala Prime Park São Marcos", location: "São Marcos, São Luís - MA", price: 3650, size: 45, capacity: 6, rating: 4.7, lat: -2.4923, lng: -44.2812 },
+];
+
+export const properties: Property[] = propertiesSeed.map((item, index) => {
+  const image = officeImages[index % officeImages.length];
+  const secondaryImage = officeImages[(index + 2) % officeImages.length];
+  const tertiaryImage = officeImages[(index + 4) % officeImages.length];
+  const features = featureSets[index % featureSets.length];
+
+  return {
+    id: item.id,
+    title: item.title,
+    type: "Sala Comercial",
+    price: item.price,
+    location: item.location,
+    size: item.size,
+    capacity: item.capacity,
+    rating: item.rating,
+    image,
+    images: [image, secondaryImage, tertiaryImage],
+    description:
+      `${item.title} em localizacao nobre de Sao Luis, ideal para operacoes administrativas, atendimento premium e equipes que precisam de presenca corporativa forte. ` +
+      `A sala entrega infraestrutura pronta para uso, facil acesso e perfil executivo valorizado na regiao.`,
+    features,
+    lat: item.lat,
+    lng: item.lng,
+  };
+});
