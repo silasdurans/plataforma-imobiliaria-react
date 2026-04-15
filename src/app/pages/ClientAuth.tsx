@@ -1,38 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Building2, Eye, EyeOff, Lock, Mail, User, UserPlus, LogIn, ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router";
+import {
+  ClientUser,
+  getClientSession,
+  getClientUsers,
+  saveClientSession,
+  saveClientUsers,
+} from "../lib/clientSession";
 
 type AuthMode = "login" | "register";
-
-interface ClientUser {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  createdAt: string;
-}
-
-const USERS_STORAGE_KEY = "grupo-sp-client-users";
-const SESSION_STORAGE_KEY = "grupo-sp-client-session";
-
-const getClientUsers = (): ClientUser[] => {
-  const raw = localStorage.getItem(USERS_STORAGE_KEY);
-
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    return JSON.parse(raw) as ClientUser[];
-  } catch {
-    return [];
-  }
-};
-
-const saveClientUsers = (users: ClientUser[]) => {
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-};
 
 export default function ClientAuth() {
   const navigate = useNavigate();
@@ -52,6 +30,12 @@ export default function ClientAuth() {
     () => (mode === "login" ? "Entrar como cliente" : "Criar conta de cliente"),
     [mode],
   );
+
+  useEffect(() => {
+    if (getClientSession()) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -87,17 +71,16 @@ export default function ClientAuth() {
       email: normalizedEmail,
       password: form.password,
       createdAt: new Date().toISOString(),
+      phone: "",
+      bio: "",
+      location: "São Luís, Maranhão",
     };
 
     saveClientUsers([newUser, ...users]);
-    localStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({ id: newUser.id, name: newUser.name, email: newUser.email }),
-    );
-
+    saveClientSession({ id: newUser.id, name: newUser.name, email: newUser.email });
     setSuccess("Cadastro realizado com sucesso. Você já está logado.");
     setError("");
-    setTimeout(() => navigate("/"), 900);
+    setTimeout(() => navigate("/", { replace: true }), 900);
   };
 
   const handleLogin = () => {
@@ -112,14 +95,10 @@ export default function ClientAuth() {
       return;
     }
 
-    localStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({ id: user.id, name: user.name, email: user.email }),
-    );
-
+    saveClientSession({ id: user.id, name: user.name, email: user.email });
     setSuccess(`Bem-vindo, ${user.name}.`);
     setError("");
-    setTimeout(() => navigate("/"), 900);
+    setTimeout(() => navigate("/", { replace: true }), 900);
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -135,7 +114,7 @@ export default function ClientAuth() {
         handleLogin();
       }
       setIsLoading(false);
-    }, 500);
+    }, 400);
   };
 
   return (
@@ -145,11 +124,7 @@ export default function ClientAuth() {
         <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-600/10 rounded-full blur-[140px]" />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md relative z-10"
-      >
+      <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md relative z-10">
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
           <div className="flex items-center justify-between mb-6">
             <Link to="/" className="text-slate-300 hover:text-white transition-colors">
@@ -193,17 +168,8 @@ export default function ClientAuth() {
             <p className="text-slate-300">{title}</p>
           </div>
 
-          {error && (
-            <div className="mb-4 rounded-2xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-100">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">
-              {success}
-            </div>
-          )}
+          {error && <div className="mb-4 rounded-2xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-100">{error}</div>}
+          {success && <div className="mb-4 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">{success}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "register" && (
@@ -211,13 +177,7 @@ export default function ClientAuth() {
                 <label className="block text-sm text-slate-200 mb-2">Nome completo</label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(event) => handleChange("name", event.target.value)}
-                    placeholder="Seu nome"
-                    className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  />
+                  <input type="text" value={form.name} onChange={(event) => handleChange("name", event.target.value)} placeholder="Seu nome" className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
                 </div>
               </div>
             )}
@@ -226,14 +186,7 @@ export default function ClientAuth() {
               <label className="block text-sm text-slate-200 mb-2">E-mail</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => handleChange("email", event.target.value)}
-                  placeholder="cliente@email.com"
-                  className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  required
-                />
+                <input type="email" value={form.email} onChange={(event) => handleChange("email", event.target.value)} placeholder="cliente@email.com" className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" required />
               </div>
             </div>
 
@@ -241,19 +194,8 @@ export default function ClientAuth() {
               <label className="block text-sm text-slate-200 mb-2">Senha</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={(event) => handleChange("password", event.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                >
+                <input type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => handleChange("password", event.target.value)} placeholder="••••••••" className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" required />
+                <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors">
                   {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                 </button>
               </div>
@@ -264,25 +206,12 @@ export default function ClientAuth() {
                 <label className="block text-sm text-slate-200 mb-2">Confirmar senha</label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={form.confirmPassword}
-                    onChange={(event) => handleChange("confirmPassword", event.target.value)}
-                    placeholder="Repita a senha"
-                    className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    required
-                  />
+                  <input type={showPassword ? "text" : "password"} value={form.confirmPassword} onChange={(event) => handleChange("confirmPassword", event.target.value)} placeholder="Repita a senha" className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" required />
                 </div>
               </div>
             )}
 
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-500/30 disabled:opacity-60"
-            >
+            <motion.button type="submit" disabled={isLoading} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-500/30 disabled:opacity-60">
               {isLoading ? (
                 <>
                   <div className="size-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />

@@ -22,11 +22,13 @@ import { Header } from "../components/Header";
 import { AIAgent } from "../components/AIAgent";
 import { Footer } from "../components/Footer";
 import { useParams, Link } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { motion } from "motion/react";
 import { ScheduleVisitModal } from "../components/common/ScheduleVisitModal";
+import { MapSection } from "../components/common/MapSection";
 import { useProperties } from "../../data/properties";
+import { FAVORITES_EVENT, isPropertyFavorite, toggleFavoriteProperty } from "../lib/clientFavorites";
 
 export default function PropertyDetail() {
   const { id } = useParams();
@@ -34,6 +36,23 @@ export default function PropertyDetail() {
   const property = properties.find(p => p.id === id);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    if (!id) {
+      return;
+    }
+
+    const syncFavorite = () => setIsFavorite(isPropertyFavorite(id));
+
+    syncFavorite();
+    window.addEventListener(FAVORITES_EVENT, syncFavorite);
+    window.addEventListener("storage", syncFavorite);
+
+    return () => {
+      window.removeEventListener(FAVORITES_EVENT, syncFavorite);
+      window.removeEventListener("storage", syncFavorite);
+    };
+  }, [id]);
 
   if (!property) {
     return (
@@ -154,7 +173,10 @@ export default function PropertyDetail() {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={() => setIsFavorite(!isFavorite)}
+                onClick={() => {
+                  if (!id) return;
+                  setIsFavorite(toggleFavoriteProperty(id));
+                }}
                 className="p-3 bg-white/95 backdrop-blur-sm hover:bg-white rounded-full shadow-xl transition-colors"
               >
                 <Heart className={`size-5 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-700'}`} />
@@ -295,16 +317,16 @@ export default function PropertyDetail() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm"
             >
-              <h2 className="text-2xl mb-4 text-[#0F172A]">Localização</h2>
-              <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center mb-4">
-                <MapPin className="size-16 text-[#0F172A]/30" />
-              </div>
-              <p className="text-slate-600 flex items-center gap-2">
-                <MapPin className="size-5 text-[#0F172A]" />
-                {property.location}
-              </p>
+              <MapSection
+                title="Nossa Localização"
+                cityOptions={[
+                  { label: "São Luís", query: "Sao Luis, Maranhao, Brasil" },
+                  { label: "Local do Imóvel", query: `${property.location}, Brasil` },
+                  { label: "São José de Ribamar", query: "Sao Jose de Ribamar, Maranhao, Brasil" },
+                  { label: "Paço do Lumiar", query: "Paco do Lumiar, Maranhao, Brasil" },
+                ]}
+              />
             </motion.div>
           </div>
 

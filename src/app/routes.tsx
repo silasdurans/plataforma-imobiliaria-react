@@ -5,6 +5,7 @@ import PropertyDetail from "./pages/PropertyDetail";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import ClientAuth from "./pages/ClientAuth";
+import ClientProfile from "./pages/ClientProfile";
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +23,10 @@ export const router = createBrowserRouter([
   {
     path: "/cliente/login",
     Component: ClientAuth,
+  },
+  {
+    path: "/cliente/perfil",
+    Component: ClientProfile,
   },
   {
     path: "/admin/login",

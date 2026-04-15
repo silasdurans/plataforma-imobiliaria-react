@@ -1,8 +1,9 @@
 import { MapPin, Users, Maximize2, Star, Heart } from "lucide-react";
 import { Link } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { motion } from "motion/react";
+import { FAVORITES_EVENT, isPropertyFavorite, toggleFavoriteProperty } from "../../lib/clientFavorites";
 
 interface PropertyCardProps {
   id: string;
@@ -29,6 +30,19 @@ export function PropertyCard({
 }: PropertyCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
 
+  useEffect(() => {
+    const syncFavorite = () => setIsFavorite(isPropertyFavorite(id));
+
+    syncFavorite();
+    window.addEventListener(FAVORITES_EVENT, syncFavorite);
+    window.addEventListener("storage", syncFavorite);
+
+    return () => {
+      window.removeEventListener(FAVORITES_EVENT, syncFavorite);
+      window.removeEventListener("storage", syncFavorite);
+    };
+  }, [id]);
+
   return (
     <Link to={`/imovel/${id}`} className="group block">
       <motion.div 
@@ -47,7 +61,7 @@ export function PropertyCard({
           <button
             onClick={(e) => {
               e.preventDefault();
-              setIsFavorite(!isFavorite);
+              setIsFavorite(toggleFavoriteProperty(id));
             }}
             className="absolute top-4 right-4 size-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-all z-10 shadow-lg"
           >
