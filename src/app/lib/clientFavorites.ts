@@ -1,3 +1,6 @@
+/**
+ * Utilitários para favoritos do cliente. Salva, remove e consulta imóveis marcados no armazenamento local.
+ */
 import { getClientSession } from "./clientSession";
 
 export const FAVORITES_EVENT = "grupo-sp-client-favorites:updated";

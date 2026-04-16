@@ -1,3 +1,6 @@
+/**
+ * Card reutilizável para exibir um imóvel resumido em listas, vitrines e resultados.
+ */
 import { MapPin, Users, Maximize2, Star, Heart } from "lucide-react";
 import { Link } from "react-router";
 import { useEffect, useState } from "react";

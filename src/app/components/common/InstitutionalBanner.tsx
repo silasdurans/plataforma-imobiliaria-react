@@ -1,3 +1,6 @@
+/**
+ * Bloco institucional reutilizável. Destaca mensagem de marca, credibilidade ou chamada estratégica.
+ */
 import { motion } from "motion/react";
 import { ExternalLink, Building2, Award, TrendingUp, Users, Shield, ChevronRight, Sparkles } from "lucide-react";
 

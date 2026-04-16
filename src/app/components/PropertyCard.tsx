@@ -1,3 +1,6 @@
+/**
+ * Versão alternativa ou legada do card de imóvel.
+ */
 import { MapPin, Users, Maximize2, Star, Heart } from "lucide-react";
 import { Link } from "react-router";
 import { useEffect, useState } from "react";

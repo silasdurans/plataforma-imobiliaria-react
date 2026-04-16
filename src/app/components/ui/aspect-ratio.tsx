@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (aspect-ratio). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 "use client";
 
 import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio";

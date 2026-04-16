@@ -1,3 +1,6 @@
+/**
+ * Cabeçalho principal da aplicação. Renderiza navegação, acesso do cliente e menu responsivo.
+ */
 import { User, Menu, Shield, X, LogOut } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { motion } from "motion/react";
@@ -8,7 +11,10 @@ import { clearClientSession, getClientSession } from "../../lib/clientSession";
 export function Header() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Recalcula a sessão ao trocar de rota para manter o cabeçalho sincronizado
+  // com login/logout feitos em outras telas.
   const clientSession = useMemo(() => getClientSession(), [location.pathname]);
+  // Gera as iniciais que aparecem no avatar do cliente logado.
   const avatarFallback = (clientSession?.name ?? "U")
     .split(" ")
     .slice(0, 2)
@@ -19,6 +25,7 @@ export function Header() {
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   const handleLogout = () => {
+    // Limpa a sessão local e força retorno para a home.
     clearClientSession();
     closeMobileMenu();
     window.location.href = "/";

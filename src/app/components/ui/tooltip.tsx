@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (tooltip). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 "use client";
 
 import * as React from "react";

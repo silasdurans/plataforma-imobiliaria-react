@@ -1,3 +1,6 @@
+/**
+ * Rodapé principal da aplicação. Reúne links institucionais, contato e informações de fechamento das páginas.
+ */
 import { Mail, Phone, MapPin, Linkedin, Instagram, Facebook } from "lucide-react";
 import { Link } from "react-router";
 import logo from "../../../assets/logo-grupo-sao-paulo.png";

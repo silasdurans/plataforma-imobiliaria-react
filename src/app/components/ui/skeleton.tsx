@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (skeleton). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 import { cn } from "./utils";
 
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {

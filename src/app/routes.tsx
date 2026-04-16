@@ -1,3 +1,6 @@
+/**
+ * Mapa central de rotas do frontend. Define quais páginas são carregadas em cada URL.
+ */
 import { createBrowserRouter } from "react-router";
 import Home from "./pages/Home";
 import Results from "./pages/Results";
@@ -21,6 +24,7 @@ export const router = createBrowserRouter([
     Component: PropertyDetail,
   },
   {
+    // Rotas protegidas visualmente pelo fluxo de autenticação do cliente.
     path: "/cliente/login",
     Component: ClientAuth,
   },

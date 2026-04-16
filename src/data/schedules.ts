@@ -1,3 +1,6 @@
+/**
+ * Camada de dados dos agendamentos. Centraliza leitura, persistência e atualização das visitas marcadas.
+ */
 import { useEffect, useState } from "react";
 
 export type ScheduleStatus = "agendado" | "confirmado" | "cancelado";

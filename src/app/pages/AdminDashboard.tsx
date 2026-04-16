@@ -1,3 +1,6 @@
+/**
+ * Painel administrativo da plataforma. Permite acompanhar dados, imóveis e operações de gestão.
+ */
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "motion/react";
 import { 

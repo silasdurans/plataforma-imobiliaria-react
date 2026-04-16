@@ -1,3 +1,6 @@
+/**
+ * Página de login administrativo. Controla o acesso ao painel interno da aplicação.
+ */
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Building2, Lock, Mail, Eye, EyeOff, Shield, AlertCircle } from "lucide-react";

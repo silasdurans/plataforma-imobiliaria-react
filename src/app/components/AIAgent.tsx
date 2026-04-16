@@ -1,3 +1,6 @@
+/**
+ * Componente da experiência com IA. Apresenta a interface do assistente inteligente dentro da aplicação.
+ */
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, X, Send, Mic, Calendar, MapPin, DollarSign, Building2, Users, TrendingUp, Clock, Zap, CheckCircle2, MessageSquare } from "lucide-react";

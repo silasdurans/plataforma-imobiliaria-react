@@ -1,3 +1,6 @@
+/**
+ * Componente de chat da aplicação. Organiza a conversa entre usuário e assistente virtual.
+ */
 import { MessageCircle, X, Send, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";

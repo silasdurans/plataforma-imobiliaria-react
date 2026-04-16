@@ -1,3 +1,6 @@
+/**
+ * Utilitários de autenticação do cliente no navegador. Gerencia sessão, cadastro local e atualização do perfil salvo no localStorage.
+ */
 export interface ClientSession {
   id: string;
   name: string;
@@ -25,6 +28,7 @@ export const getClientSession = (): ClientSession | null => {
   try {
     return JSON.parse(raw) as ClientSession;
   } catch {
+    // Evita quebrar a aplicação caso o valor salvo esteja inválido.
     return null;
   }
 };
@@ -47,6 +51,7 @@ export const getClientUsers = (): ClientUser[] => {
   try {
     return JSON.parse(raw) as ClientUser[];
   } catch {
+    // Se os dados estiverem corrompidos, devolve uma lista vazia como fallback.
     return [];
   }
 };
@@ -76,6 +81,7 @@ export const updateCurrentClientUser = (updates: Partial<ClientUser>): ClientUse
   const updatedUser = {
     ...currentUser,
     ...updates,
+    // Mantém alguns campos sempre higienizados antes de persistir.
     name: updates.name?.trim() || currentUser.name,
     email: updates.email?.trim().toLowerCase() || currentUser.email,
   };

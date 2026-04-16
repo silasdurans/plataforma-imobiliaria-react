@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (navigation-menu). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 import * as React from "react";
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu";
 import { cva } from "class-variance-authority";

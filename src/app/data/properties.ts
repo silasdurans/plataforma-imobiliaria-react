@@ -1,3 +1,6 @@
+/**
+ * Base inicial de imóveis usada como seed do projeto. Serve como fonte padrão quando ainda não há dados persistidos.
+ */
 export interface Property {
   id: string;
   title: string;
@@ -60,6 +63,8 @@ const propertiesSeed = [
 ];
 
 export const properties: Property[] = propertiesSeed.map((item, index) => {
+  // Reaproveita as listas de imagens e comodidades para montar uma base inicial variada
+  // sem precisar repetir manualmente todos os campos em cada imóvel.
   const image = officeImages[index % officeImages.length];
   const secondaryImage = officeImages[(index + 2) % officeImages.length];
   const tertiaryImage = officeImages[(index + 4) % officeImages.length];

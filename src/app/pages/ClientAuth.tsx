@@ -1,3 +1,6 @@
+/**
+ * Página de autenticação do cliente. Reúne fluxo de login e cadastro para acesso à área do usuário.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Building2, Eye, EyeOff, Lock, Mail, User, UserPlus, LogIn, ArrowLeft } from "lucide-react";

@@ -1,3 +1,6 @@
+/**
+ * Página inicial da plataforma. Apresenta a busca principal, destaques e atalhos para os imóveis disponíveis.
+ */
 import { Search, Sparkles, Award, ArrowRight, MapPin, X } from "lucide-react";
 import { Header } from "../components/layout/Header";
 import { Footer } from "../components/layout/Footer";

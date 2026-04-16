@@ -1,3 +1,6 @@
+/**
+ * Página de perfil do cliente. Mostra dados da conta, favoritos e histórico relacionado ao usuário logado.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
 import {

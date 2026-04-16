@@ -1,3 +1,6 @@
+/**
+ * Seção reutilizável de mapa. Mostra a localização geográfica do imóvel ou ponto de interesse.
+ */
 import { useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
 

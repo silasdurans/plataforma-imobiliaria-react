@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (input). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 import * as React from "react";
 
 import { cn } from "./utils";

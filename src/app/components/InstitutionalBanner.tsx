@@ -1,3 +1,6 @@
+/**
+ * Versão alternativa ou legada do banner institucional.
+ */
 import { motion } from "motion/react";
 import { ExternalLink, Building2, Award, TrendingUp, Users, Shield, ChevronRight, Sparkles } from "lucide-react";
 

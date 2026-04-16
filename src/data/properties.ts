@@ -1,3 +1,6 @@
+/**
+ * Camada de dados dos imóveis no frontend. Faz leitura, cache local, sincronização com a API e oferece hooks/utilitários para consumo nas páginas.
+ */
 import { useEffect, useState } from "react";
 import { properties as seedProperties } from "../app/data/properties";
 
@@ -37,10 +40,13 @@ const isBrowser = () => typeof window !== "undefined";
 
 const dispatchPropertiesEvent = () => {
   if (!isBrowser()) return;
+  // Dispara um evento interno para manter múltiplos componentes sincronizados.
   window.dispatchEvent(new Event(STORAGE_EVENT));
 };
 
 const normalizeProperty = (property: Partial<Property>, index = 0): Property => {
+  // Garante que todo imóvel tenha os campos esperados pelo frontend,
+  // mesmo quando vier incompleto do localStorage ou da API.
   const mainImage = property.image || property.images?.[0] || DEFAULT_IMAGE;
   const size = Number(property.size ?? property.area ?? 60);
   const capacity = Number(property.capacity ?? property.bedrooms ?? 4);
@@ -115,6 +121,7 @@ const loadCachedProperties = (): Property[] => {
     const parsedProperties = JSON.parse(storedProperties) as Partial<Property>[];
     return parsedProperties.map((property, index) => normalizeProperty(property, index));
   } catch {
+    // Em caso de cache corrompido, recria a base local com os dados padrão.
     cacheProperties(defaultProperties);
     return defaultProperties;
   }
@@ -159,6 +166,7 @@ export const getAllProperties = async (): Promise<Property[]> => {
     cacheProperties(properties);
     return properties;
   } catch {
+    // Se a API estiver indisponível, a aplicação continua funcionando com cache/local seed.
     return renderizarImoveis();
   }
 };
@@ -210,6 +218,7 @@ export const useProperties = () => {
       setProperties(await getAllProperties());
     };
 
+    // Sincroniza tanto alterações da aba atual quanto de outras abas do navegador.
     syncProperties();
     window.addEventListener(STORAGE_EVENT, syncProperties);
     window.addEventListener("storage", syncProperties);

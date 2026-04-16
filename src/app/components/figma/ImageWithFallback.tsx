@@ -1,3 +1,6 @@
+/**
+ * Componente auxiliar de imagem com fallback. Evita quebra visual quando a imagem principal falha ao carregar.
+ */
 import React, { useState } from 'react'
 
 const ERROR_IMG_SRC =

@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (sonner). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 "use client";
 
 import { useTheme } from "next-themes";

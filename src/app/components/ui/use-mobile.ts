@@ -1,3 +1,6 @@
+/**
+ * Hook utilitário de interface. Detecta comportamento mobile para apoiar decisões responsivas nos componentes.
+ */
 import * as React from "react";
 
 const MOBILE_BREAKPOINT = 768;

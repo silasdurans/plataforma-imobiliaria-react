@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (collapsible). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 "use client";
 
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";

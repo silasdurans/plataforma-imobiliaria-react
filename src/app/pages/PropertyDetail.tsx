@@ -1,3 +1,6 @@
+/**
+ * Página de detalhes do imóvel. Exibe informações completas, galeria, mapa e ações de contato/agendamento.
+ */
 import { 
   MapPin, 
   Maximize2, 

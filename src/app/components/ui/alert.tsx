@@ -1,3 +1,6 @@
+/**
+ * Componente base de interface reutilizável (alert). Encapsula comportamento e estilos compartilhados para uso em várias telas.
+ */
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 
