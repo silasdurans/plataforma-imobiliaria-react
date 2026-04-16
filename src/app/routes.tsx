@@ -4,10 +4,10 @@
 import { Suspense, lazy } from "react";
 import type { ComponentType } from "react";
 import { createBrowserRouter } from "react-router";
+import Home from "./pages/Home";
+import Results from "./pages/Results";
+import PropertyDetail from "./pages/PropertyDetail";
 
-const Home = lazy(() => import("./pages/Home"));
-const Results = lazy(() => import("./pages/Results"));
-const PropertyDetail = lazy(() => import("./pages/PropertyDetail"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const ClientAuth = lazy(() => import("./pages/ClientAuth"));
@@ -43,15 +43,15 @@ const withSuspense = (Component: ComponentType) =>
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: withSuspense(Home),
+    Component: Home,
   },
   {
     path: "/resultados",
-    Component: withSuspense(Results),
+    Component: Results,
   },
   {
     path: "/imovel/:id",
-    Component: withSuspense(PropertyDetail),
+    Component: PropertyDetail,
   },
   {
     // Rotas protegidas visualmente pelo fluxo de autenticação do cliente.
