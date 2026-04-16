@@ -49,14 +49,6 @@ export type AIStatus = {
   message: string;
 };
 
-export type RemoteAIChatResult = {
-  provider: string;
-  model: string;
-  reply: string;
-  suggestions: string[];
-  propertyIds: string[];
-};
-
 const stopWords = new Set([
   "a",
   "ao",
@@ -420,32 +412,4 @@ export const searchPropertiesWithAI = async (query: string): Promise<RemoteAISea
   }
 
   return (await response.json()) as RemoteAISearchResult;
-};
-
-export const chatWithAI = async (
-  message: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-): Promise<RemoteAIChatResult> => {
-  const trimmedMessage = message.trim();
-
-  if (!trimmedMessage) {
-    throw new Error("Message is required");
-  }
-
-  const response = await fetch(`${API_BASE_URL}/api/ai-chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: trimmedMessage,
-      history: history.slice(-8),
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("AI chat unavailable");
-  }
-
-  return (await response.json()) as RemoteAIChatResult;
 };
