@@ -1,6 +1,6 @@
 # 🏢 Plataforma Imobiliária - Grupo São Paulo Participações
 
-Plataforma moderna de imóveis comerciais com IA, construída com React, TypeScript e Tailwind CSS v4.
+Plataforma moderna de imóveis comerciais com busca inteligente por IA, construída com React, TypeScript e Tailwind CSS v4.
 
 ---
 
@@ -116,6 +116,21 @@ import { properties } from "./data/properties";
 
 ---
 
+## 🤖 Estratégia de IA
+
+Hoje o projeto adota uma estratégia simples e explícita:
+
+- **Busca principal com IA:** a experiência oficial de IA está na `Home` e em `Resultados`, usando `Ollama` no backend quando disponível.
+- **Fallback local de busca:** se o `Ollama` não estiver disponível, a aplicação continua funcionando com ranking heurístico local.
+- **Chatbot flutuante:** o `AIAgent` permanece local, com respostas guiadas por regras do produto e fluxo confiável de agendamento. Ele **não** depende do `Ollama`.
+
+Isso evita sobreposição de responsabilidades:
+
+- a **busca** é a interface inteligente para descobrir imóveis
+- o **chatbot** é um assistente rápido para navegação e agendamento
+
+---
+
 ## 🤖 Busca com Ollama
 
 A busca inteligente principal está preparada para usar `Ollama` local no backend, sem depender de chave paga.
@@ -134,7 +149,7 @@ ollama pull qwen2.5:3b
 
 3. Crie o arquivo `backend/.env` a partir de [backend/.env.example](/home/silasdurans/Documentos/dev/Projetogruposp0/backend/.env.example)
 
-4. Suba o Ollama
+4. O serviço costuma subir automaticamente após a instalação. Se precisar iniciar manualmente:
 ```bash
 ollama serve
 ```
@@ -164,9 +179,27 @@ OLLAMA_MODEL=qwen2.5:3b
 PORT=3001
 ```
 
-### Observação
+### Observações
 
-Se o Ollama não estiver disponível, o frontend continua funcionando com o fallback local da busca heurística.
+- Se o `Ollama` não estiver disponível, o frontend continua funcionando com o fallback local da busca heurística.
+- O chatbot da interface **não usa Ollama** neste momento.
+- O comando `npm run dev:full` sobe o frontend e o backend preparado para busca com IA.
+
+---
+
+## 🛠️ Higiene do Repositório
+
+Arquivos gerados localmente não fazem parte do versionamento:
+
+- `dist/`
+- `node_modules/.vite/`
+- `backend/properties.db`
+
+Se algum deles já tiver sido rastreado antes, remova do índice uma vez:
+
+```bash
+git rm -r --cached dist node_modules/.vite backend/properties.db
+```
 
 ---
 
@@ -199,13 +232,14 @@ Senha: admin123
 ## 🎯 Funcionalidades
 
 ### ✨ **Principais**
-- 🤖 **Agente de IA Conversacional** - Busca inteligente por linguagem natural
+- 🤖 **Busca Inteligente com IA** - Interpretação semântica na Home e nos Resultados
+- 💬 **Chatbot de apoio** - Assistência local para navegação e agendamento
 - 🔍 **Filtros Ultra Avançados** - 8 categorias de filtros (tipo, preço, área, etc.)
 - 📊 **Painel Administrativo** - Dashboard completo para gestão
 - 🏢 **Banner Institucional** - Apresentação do Grupo São Paulo
 - 📱 **Design Responsivo** - Mobile-first
 - 🎨 **Animações Fluidas** - Motion (Framer Motion)
-- ⚡ **Performance** - Carregamento otimizado
+- ⚡ **Performance** - Carregamento otimizado com rotas lazy-loaded
 
 ### 🎨 **Design**
 - Glassmorphism
