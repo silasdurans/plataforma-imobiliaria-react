@@ -435,65 +435,6 @@ async function runOllamaSearch(query, properties) {
   };
 }
 
-async function runOllamaChat(message, history, properties) {
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      format: "json",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Voce e um assistente comercial da Sao Paulo Participacoes, especializado em imoveis comerciais em Sao Luis - MA. " +
-            "Responda em portugues do Brasil, com tom claro, amigavel e objetivo. " +
-            "Use somente informacoes presentes no contexto enviado. " +
-            "Se a pergunta for sobre busca de imoveis, recomende opcoes reais do contexto e sugira proximos passos. " +
-            "Se nao houver correspondencia exata, explique isso sem inventar. " +
-            "Devolva apenas JSON valido, sem markdown e sem texto extra. " +
-            'Formato esperado: {"reply":"string","suggestions":["string"],"property_ids":["string"]}. ' +
-            "Use apenas property_ids existentes no contexto. Limite suggestions a no maximo 4 itens curtos.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            message,
-            history: Array.isArray(history) ? history.slice(-8) : [],
-            properties: properties.map(buildPropertySearchContext),
-          }),
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Ollama chat request failed: ${response.status} ${errorText}`);
-  }
-
-  const payload = await response.json();
-  const content = payload?.message?.content || "";
-  const parsed = JSON.parse(extractJsonObject(content));
-  const propertyIds = applyAIPropertySelection(properties, parsed);
-
-  return {
-    provider: "ollama",
-    model: OLLAMA_MODEL,
-    reply:
-      typeof parsed.reply === "string" && parsed.reply.trim()
-        ? parsed.reply.trim()
-        : "Posso ajudar a encontrar um imovel comercial ideal para voce.",
-    suggestions: Array.isArray(parsed.suggestions)
-      ? parsed.suggestions.filter((item) => typeof item === "string").slice(0, 4)
-      : [],
-    propertyIds,
-  };
-}
-
 async function initializeDatabase() {
   try {
     await run(`
@@ -720,33 +661,6 @@ app.post("/api/ai-search", async (req, res) => {
   } catch (error) {
     console.error("AI search failed:", error.message);
     res.status(503).json({ error: "AI search unavailable" });
-  }
-});
-
-app.post("/api/ai-chat", async (req, res) => {
-  try {
-    const message = String(req.body?.message || "").trim();
-    const history = Array.isArray(req.body?.history) ? req.body.history : [];
-
-    if (!message) {
-      res.status(400).json({ error: "Message is required" });
-      return;
-    }
-
-    const ollamaStatus = await getOllamaStatus();
-    if (!ollamaStatus.available) {
-      res.status(503).json({ error: ollamaStatus.message });
-      return;
-    }
-
-    const rows = await all("SELECT * FROM properties_v2 ORDER BY datetime(created_at) DESC, title ASC");
-    const properties = rows.map(mapPropertyRow);
-    const result = await runOllamaChat(message, history, properties);
-
-    res.json(result);
-  } catch (error) {
-    console.error("AI chat failed:", error.message);
-    res.status(503).json({ error: "AI chat unavailable" });
   }
 });
 
