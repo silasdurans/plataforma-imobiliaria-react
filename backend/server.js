@@ -5,14 +5,22 @@ require("dotenv").config();
 const express = require("express");
 const sqlite3 = require("sqlite3").verbose();
 const cors = require("cors");
+const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || "0.0.0.0";
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:3b";
-const dbPath = path.join(__dirname, "properties.db");
+const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
+
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const dbPath = process.env.DATABASE_PATH || path.join(dataDir, "properties.db");
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error("Error opening database:", err.message);
@@ -24,8 +32,18 @@ const db = new sqlite3.Database(dbPath, (err) => {
   initializeDatabase();
 });
 
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  }),
+);
 app.use(express.json());
+
+const CLIENT_SESSION_COOKIE = "grupo_sp_client_session";
+const ADMIN_SESSION_COOKIE = "grupo_sp_admin_session";
+const ADMIN_EMAIL = "admin@saopauloparticipacoes.com.br";
+const ADMIN_PASSWORD = "admin123";
 
 const officeImages = [
   "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80",
@@ -106,12 +124,73 @@ const defaultSchedules = [
     clientName: "Ana Clara",
     clientEmail: "ana@email.com",
     clientId: "seed-client-1",
+    clientPhone: "(98) 98888-1234",
     date: "2026-04-16",
     time: "11:00",
     status: "agendado",
     notes: "Visita criada no seed inicial.",
   },
 ];
+
+const parseCookies = (cookieHeader = "") =>
+  cookieHeader
+    .split(";")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .reduce((cookies, item) => {
+      const separatorIndex = item.indexOf("=");
+
+      if (separatorIndex === -1) {
+        return cookies;
+      }
+
+      const key = item.slice(0, separatorIndex);
+      const value = item.slice(separatorIndex + 1);
+      cookies[key] = decodeURIComponent(value);
+      return cookies;
+    }, {});
+
+const getCookie = (req, name) => parseCookies(req.headers.cookie || "")[name] || null;
+
+const buildCookie = (name, value, options = {}) => {
+  const parts = [`${name}=${encodeURIComponent(value)}`];
+
+  if (options.httpOnly !== false) parts.push("HttpOnly");
+  parts.push(`Path=${options.path || "/"}`);
+
+  if (typeof options.maxAge === "number") {
+    parts.push(`Max-Age=${Math.max(0, Math.floor(options.maxAge))}`);
+  }
+
+  if (options.sameSite) parts.push(`SameSite=${options.sameSite}`);
+  if (options.secure) parts.push("Secure");
+
+  return parts.join("; ");
+};
+
+const setSessionCookie = (res, name, value) => {
+  res.setHeader(
+    "Set-Cookie",
+    buildCookie(name, value, {
+      httpOnly: true,
+      path: "/",
+      sameSite: "Lax",
+      maxAge: 60 * 60 * 24 * 30,
+    }),
+  );
+};
+
+const clearSessionCookie = (res, name) => {
+  res.setHeader(
+    "Set-Cookie",
+    buildCookie(name, "", {
+      httpOnly: true,
+      path: "/",
+      sameSite: "Lax",
+      maxAge: 0,
+    }),
+  );
+};
 
 const normalizeProperty = (property = {}) => {
   // Normaliza dados vindos do banco ou do cliente para manter o contrato da API estável.
@@ -154,17 +233,66 @@ const normalizeProperty = (property = {}) => {
   };
 };
 
-const normalizeSchedule = (schedule = {}) => ({
-  id: Number(schedule.id || 0),
-  propertyTitle: String(schedule.propertyTitle || "").trim(),
-  clientName: String(schedule.clientName || "").trim(),
-  clientEmail: String(schedule.clientEmail || "").trim().toLowerCase(),
-  clientId: schedule.clientId ? String(schedule.clientId) : null,
-  date: String(schedule.date || "").trim(),
-  time: String(schedule.time || "").trim(),
-  status: ["agendado", "confirmado", "cancelado"].includes(schedule.status) ? schedule.status : "agendado",
-  notes: schedule.notes ? String(schedule.notes) : "",
-  createdAt: schedule.createdAt || new Date().toISOString(),
+const normalizeTimeValue = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+
+  if (!match) {
+    return "";
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours > 23 || minutes > 59) {
+    return "";
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const normalizeSchedule = (schedule = {}) => {
+  const isAllDay = Boolean(
+    schedule.isAllDay === true ||
+    schedule.isAllDay === 1 ||
+    schedule.isAllDay === "1" ||
+    schedule.time === "dia-inteiro",
+  );
+  const legacyTime = normalizeTimeValue(schedule.time);
+  const startTime = isAllDay
+    ? ""
+    : normalizeTimeValue(schedule.startTime || schedule.time);
+  const endTime = isAllDay
+    ? ""
+    : normalizeTimeValue(schedule.endTime || "");
+
+  return {
+    id: Number(schedule.id || 0),
+    propertyTitle: String(schedule.propertyTitle || "").trim(),
+    clientName: String(schedule.clientName || "").trim(),
+    clientEmail: String(schedule.clientEmail || "").trim().toLowerCase(),
+    clientId: schedule.clientId ? String(schedule.clientId) : null,
+    clientPhone: schedule.clientPhone ? String(schedule.clientPhone).trim() : "",
+    date: String(schedule.date || "").trim(),
+    time: isAllDay ? "dia-inteiro" : legacyTime || startTime,
+    startTime,
+    endTime,
+    isAllDay,
+    status: ["agendado", "confirmado", "cancelado"].includes(schedule.status) ? schedule.status : "agendado",
+    notes: schedule.notes ? String(schedule.notes) : "",
+    createdAt: schedule.createdAt || new Date().toISOString(),
+  };
+};
+
+const normalizeClientUser = (user = {}) => ({
+  id: String(user.id || crypto.randomUUID()),
+  name: String(user.name || "").trim(),
+  email: String(user.email || "").trim().toLowerCase(),
+  password: String(user.password || ""),
+  phone: user.phone ? String(user.phone).trim() : "",
+  bio: user.bio ? String(user.bio).trim() : "",
+  location: user.location ? String(user.location).trim() : "São Luís, Maranhão",
+  createdAt: user.createdAt || new Date().toISOString(),
 });
 
 const run = (sql, params = []) =>
@@ -224,6 +352,15 @@ const mapPropertyRow = (row) =>
   });
 
 const mapScheduleRow = (row) => normalizeSchedule(row);
+const mapClientUserRow = (row) => ({
+  id: String(row.id),
+  name: row.name || "",
+  email: row.email || "",
+  phone: row.phone || "",
+  bio: row.bio || "",
+  location: row.location || "São Luís, Maranhão",
+  createdAt: row.createdAt,
+});
 const normalizeText = (value = "") =>
   String(value)
     .normalize("NFD")
@@ -435,6 +572,98 @@ async function runOllamaSearch(query, properties) {
   };
 }
 
+async function insertClientUser(user) {
+  const normalized = normalizeClientUser(user);
+
+  await run(
+    `
+      INSERT INTO client_users (id, name, email, password, phone, bio, location, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      normalized.id,
+      normalized.name,
+      normalized.email,
+      normalized.password,
+      normalized.phone,
+      normalized.bio,
+      normalized.location,
+      normalized.createdAt,
+    ],
+  );
+
+  return normalized;
+}
+
+async function createClientSession(clientId) {
+  const token = crypto.randomUUID();
+  await run(
+    `
+      INSERT INTO client_sessions (token, clientId, createdAt)
+      VALUES (?, ?, ?)
+    `,
+    [token, clientId, new Date().toISOString()],
+  );
+  return token;
+}
+
+async function destroyClientSession(token) {
+  if (!token) {
+    return;
+  }
+
+  await run("DELETE FROM client_sessions WHERE token = ?", [token]);
+}
+
+async function getClientUserFromRequest(req) {
+  const token = getCookie(req, CLIENT_SESSION_COOKIE);
+
+  if (!token) {
+    return null;
+  }
+
+  const row = await get(
+    `
+      SELECT client_users.*
+      FROM client_sessions
+      JOIN client_users ON client_users.id = client_sessions.clientId
+      WHERE client_sessions.token = ?
+      LIMIT 1
+    `,
+    [token],
+  );
+
+  return row ? mapClientUserRow(row) : null;
+}
+
+async function createAdminSession() {
+  const token = crypto.randomUUID();
+  await run("INSERT INTO admin_sessions (token, createdAt) VALUES (?, ?)", [
+    token,
+    new Date().toISOString(),
+  ]);
+  return token;
+}
+
+async function destroyAdminSession(token) {
+  if (!token) {
+    return;
+  }
+
+  await run("DELETE FROM admin_sessions WHERE token = ?", [token]);
+}
+
+async function isAdminAuthenticated(req) {
+  const token = getCookie(req, ADMIN_SESSION_COOKIE);
+
+  if (!token) {
+    return false;
+  }
+
+  const row = await get("SELECT token FROM admin_sessions WHERE token = ? LIMIT 1", [token]);
+  return !!row;
+}
+
 async function initializeDatabase() {
   try {
     await run(`
@@ -469,13 +698,56 @@ async function initializeDatabase() {
         clientName TEXT NOT NULL,
         clientEmail TEXT NOT NULL,
         clientId TEXT,
+        clientPhone TEXT,
         date TEXT NOT NULL,
         time TEXT NOT NULL,
+        startTime TEXT,
+        endTime TEXT,
+        isAllDay INTEGER DEFAULT 0,
         status TEXT DEFAULT 'agendado',
         notes TEXT,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS client_users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        phone TEXT,
+        bio TEXT,
+        location TEXT,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS client_sessions (
+        token TEXT PRIMARY KEY,
+        clientId TEXT NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS client_favorites (
+        clientId TEXT NOT NULL,
+        propertyId TEXT NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (clientId, propertyId)
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS admin_sessions (
+        token TEXT PRIMARY KEY,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await ensureSchedulesSchema();
 
     const propertyCount = await get("SELECT COUNT(*) as count FROM properties_v2");
     if (!propertyCount || propertyCount.count === 0) {
@@ -591,17 +863,21 @@ async function insertSchedule(schedule) {
   const result = await run(
     `
       INSERT INTO schedules (
-        propertyTitle, clientName, clientEmail, clientId, date, time, status, notes, createdAt
+        propertyTitle, clientName, clientEmail, clientId, clientPhone, date, time, startTime, endTime, isAllDay, status, notes, createdAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       normalized.propertyTitle,
       normalized.clientName,
       normalized.clientEmail,
       normalized.clientId,
+      normalized.clientPhone,
       normalized.date,
       normalized.time,
+      normalized.startTime,
+      normalized.endTime,
+      normalized.isAllDay ? 1 : 0,
       normalized.status,
       normalized.notes,
       normalized.createdAt,
@@ -611,26 +887,363 @@ async function insertSchedule(schedule) {
   return { ...normalized, id: result.lastID };
 }
 
-async function findScheduleConflict({ propertyTitle, date, time, excludeId = null }) {
-  const query = `
-    SELECT * FROM schedules
-    WHERE propertyTitle = ?
-      AND date = ?
-      AND time = ?
-      AND status != 'cancelado'
-      ${excludeId !== null ? "AND id != ?" : ""}
-    LIMIT 1
-  `;
+const timeToMinutes = (value) => {
+  const normalized = normalizeTimeValue(value);
+  if (!normalized) return null;
+  const [hours, minutes] = normalized.split(":").map(Number);
+  return hours * 60 + minutes;
+};
 
-  const params = excludeId !== null
-    ? [propertyTitle, date, time, excludeId]
-    : [propertyTitle, date, time];
+const schedulesOverlap = (first, second) => {
+  if (first.date !== second.date || first.propertyTitle !== second.propertyTitle) {
+    return false;
+  }
 
-  return get(query, params);
+  if (first.status === "cancelado" || second.status === "cancelado") {
+    return false;
+  }
+
+  if (first.isAllDay || second.isAllDay) {
+    return true;
+  }
+
+  const firstStart = timeToMinutes(first.startTime || first.time);
+  const firstEnd = timeToMinutes(first.endTime || first.time);
+  const secondStart = timeToMinutes(second.startTime || second.time);
+  const secondEnd = timeToMinutes(second.endTime || second.time);
+
+  if (
+    firstStart === null ||
+    firstEnd === null ||
+    secondStart === null ||
+    secondEnd === null ||
+    firstStart >= firstEnd ||
+    secondStart >= secondEnd
+  ) {
+    return (first.startTime || first.time) === (second.startTime || second.time);
+  }
+
+  return firstStart < secondEnd && secondStart < firstEnd;
+};
+
+async function findScheduleConflict(schedule, excludeId = null) {
+  const rows = await all(
+    `
+      SELECT *
+      FROM schedules
+      WHERE propertyTitle = ?
+        AND date = ?
+        AND status != 'cancelado'
+        ${excludeId !== null ? "AND id != ?" : ""}
+    `,
+    excludeId !== null
+      ? [schedule.propertyTitle, schedule.date, excludeId]
+      : [schedule.propertyTitle, schedule.date],
+  );
+
+  const normalizedTarget = normalizeSchedule(schedule);
+  return rows.map(mapScheduleRow).find((row) => schedulesOverlap(normalizedTarget, row)) || null;
+}
+
+async function ensureSchedulesSchema() {
+  const columns = await all("PRAGMA table_info(schedules)");
+  const columnNames = new Set(columns.map((column) => String(column.name)));
+
+  if (!columnNames.has("clientPhone")) {
+    await run("ALTER TABLE schedules ADD COLUMN clientPhone TEXT");
+  }
+  if (!columnNames.has("startTime")) {
+    await run("ALTER TABLE schedules ADD COLUMN startTime TEXT");
+  }
+  if (!columnNames.has("endTime")) {
+    await run("ALTER TABLE schedules ADD COLUMN endTime TEXT");
+  }
+  if (!columnNames.has("isAllDay")) {
+    await run("ALTER TABLE schedules ADD COLUMN isAllDay INTEGER DEFAULT 0");
+  }
 }
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/internal/db-inspector-7f3a9c", async (_req, res) => {
+  try {
+    const tables = await all(
+      `
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+        ORDER BY name ASC
+      `,
+    );
+
+    const payload = await Promise.all(
+      tables.map(async ({ name }) => {
+        const columns = await all(`PRAGMA table_info(${name})`);
+        const countRow = await get(`SELECT COUNT(*) as count FROM ${name}`);
+        const preview = await all(`SELECT * FROM ${name} LIMIT 10`);
+
+        return {
+          name,
+          columns: columns.map((column) => ({
+            name: column.name,
+            type: column.type,
+            nullable: column.notnull === 0,
+            primaryKey: column.pk === 1,
+          })),
+          rowCount: Number(countRow?.count || 0),
+          preview,
+        };
+      }),
+    );
+
+    res.json(payload);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/client/session", async (req, res) => {
+  try {
+    const user = await getClientUserFromRequest(req);
+
+    if (!user) {
+      res.status(401).json({ error: "Client session not found" });
+      return;
+    }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/client/register", async (req, res) => {
+  try {
+    const normalized = normalizeClientUser(req.body);
+
+    if (!normalized.name || !normalized.email || !normalized.password || !normalized.phone) {
+      res.status(400).json({ error: "Missing required client fields" });
+      return;
+    }
+
+    if (normalized.password.length < 6) {
+      res.status(400).json({ error: "Password must be at least 6 characters" });
+      return;
+    }
+
+    const existing = await get("SELECT id FROM client_users WHERE email = ? LIMIT 1", [normalized.email]);
+    if (existing) {
+      res.status(409).json({ error: "Client already registered with this email" });
+      return;
+    }
+
+    await insertClientUser(normalized);
+    const sessionToken = await createClientSession(normalized.id);
+    setSessionCookie(res, CLIENT_SESSION_COOKIE, sessionToken);
+    res.status(201).json(mapClientUserRow(normalized));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/client/login", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+
+    if (!email || !password) {
+      res.status(400).json({ error: "Email and password are required" });
+      return;
+    }
+
+    const row = await get("SELECT * FROM client_users WHERE email = ? AND password = ? LIMIT 1", [
+      email,
+      password,
+    ]);
+
+    if (!row) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    const sessionToken = await createClientSession(String(row.id));
+    setSessionCookie(res, CLIENT_SESSION_COOKIE, sessionToken);
+    res.json(mapClientUserRow(row));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/client/logout", async (req, res) => {
+  try {
+    await destroyClientSession(getCookie(req, CLIENT_SESSION_COOKIE));
+    clearSessionCookie(res, CLIENT_SESSION_COOKIE);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put("/api/client/profile", async (req, res) => {
+  try {
+    const currentUser = await getClientUserFromRequest(req);
+
+    if (!currentUser) {
+      res.status(401).json({ error: "Client session not found" });
+      return;
+    }
+
+    const existingUser = await get("SELECT * FROM client_users WHERE id = ? LIMIT 1", [currentUser.id]);
+    const normalized = normalizeClientUser({
+      ...existingUser,
+      ...req.body,
+      id: currentUser.id,
+      password: existingUser?.password || "",
+      createdAt: currentUser.createdAt,
+    });
+
+    const emailInUse = await get(
+      "SELECT id FROM client_users WHERE email = ? AND id != ? LIMIT 1",
+      [normalized.email, currentUser.id],
+    );
+
+    if (emailInUse) {
+      res.status(409).json({ error: "Another client already uses this email" });
+      return;
+    }
+
+    await run(
+      `
+        UPDATE client_users
+        SET name = ?, email = ?, phone = ?, bio = ?, location = ?
+        WHERE id = ?
+      `,
+      [
+        normalized.name,
+        normalized.email,
+        normalized.phone,
+        normalized.bio,
+        normalized.location,
+        currentUser.id,
+      ],
+    );
+
+    const updatedUser = await get("SELECT * FROM client_users WHERE id = ? LIMIT 1", [currentUser.id]);
+    res.json(mapClientUserRow(updatedUser));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/client/favorites", async (req, res) => {
+  try {
+    const currentUser = await getClientUserFromRequest(req);
+
+    if (!currentUser) {
+      res.status(401).json({ error: "Client session not found" });
+      return;
+    }
+
+    const rows = await all(
+      "SELECT propertyId FROM client_favorites WHERE clientId = ? ORDER BY datetime(createdAt) DESC",
+      [currentUser.id],
+    );
+
+    res.json(rows.map((row) => String(row.propertyId)));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/client/favorites/:propertyId", async (req, res) => {
+  try {
+    const currentUser = await getClientUserFromRequest(req);
+
+    if (!currentUser) {
+      res.status(401).json({ error: "Client session not found" });
+      return;
+    }
+
+    const propertyId = String(req.params.propertyId || "").trim();
+    const existing = await get(
+      "SELECT propertyId FROM client_favorites WHERE clientId = ? AND propertyId = ? LIMIT 1",
+      [currentUser.id, propertyId],
+    );
+
+    if (existing) {
+      await run("DELETE FROM client_favorites WHERE clientId = ? AND propertyId = ?", [
+        currentUser.id,
+        propertyId,
+      ]);
+      res.json({ favorite: false });
+      return;
+    }
+
+    await run(
+      "INSERT INTO client_favorites (clientId, propertyId, createdAt) VALUES (?, ?, ?)",
+      [currentUser.id, propertyId, new Date().toISOString()],
+    );
+    res.json({ favorite: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/client/favorites/:propertyId", async (req, res) => {
+  try {
+    const currentUser = await getClientUserFromRequest(req);
+
+    if (!currentUser) {
+      res.status(401).json({ error: "Client session not found" });
+      return;
+    }
+
+    await run("DELETE FROM client_favorites WHERE clientId = ? AND propertyId = ?", [
+      currentUser.id,
+      String(req.params.propertyId || "").trim(),
+    ]);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/admin/session", async (req, res) => {
+  try {
+    res.json({ authenticated: await isAdminAuthenticated(req) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/login", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+
+    if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+      res.status(401).json({ error: "Invalid admin credentials" });
+      return;
+    }
+
+    const token = await createAdminSession();
+    setSessionCookie(res, ADMIN_SESSION_COOKIE, token);
+    res.json({ authenticated: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/logout", async (req, res) => {
+  try {
+    await destroyAdminSession(getCookie(req, ADMIN_SESSION_COOKIE));
+    clearSessionCookie(res, ADMIN_SESSION_COOKIE);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get("/api/health/ai", async (_req, res) => {
@@ -785,7 +1398,21 @@ app.post("/api/schedules", async (req, res) => {
   try {
     const normalized = normalizeSchedule(req.body);
 
-    if (!normalized.propertyTitle || !normalized.clientName || !normalized.clientEmail || !normalized.date || !normalized.time) {
+    const hasValidPeriod =
+      normalized.isAllDay ||
+      (normalized.startTime &&
+        normalized.endTime &&
+        timeToMinutes(normalized.startTime) !== null &&
+        timeToMinutes(normalized.endTime) !== null &&
+        timeToMinutes(normalized.startTime) < timeToMinutes(normalized.endTime));
+
+    if (
+      !normalized.propertyTitle ||
+      !normalized.clientName ||
+      !normalized.clientEmail ||
+      !normalized.date ||
+      !hasValidPeriod
+    ) {
       res.status(400).json({ error: "Missing required schedule fields" });
       return;
     }
@@ -818,12 +1445,26 @@ app.put("/api/schedules/:id", async (req, res) => {
       id: Number(req.params.id),
     });
 
-    const conflict = await findScheduleConflict({
-      propertyTitle: normalized.propertyTitle,
-      date: normalized.date,
-      time: normalized.time,
-      excludeId: normalized.id,
-    });
+    const hasValidPeriod =
+      normalized.isAllDay ||
+      (normalized.startTime &&
+        normalized.endTime &&
+        timeToMinutes(normalized.startTime) !== null &&
+        timeToMinutes(normalized.endTime) !== null &&
+        timeToMinutes(normalized.startTime) < timeToMinutes(normalized.endTime));
+
+    if (
+      !normalized.propertyTitle ||
+      !normalized.clientName ||
+      !normalized.clientEmail ||
+      !normalized.date ||
+      !hasValidPeriod
+    ) {
+      res.status(400).json({ error: "Missing required schedule fields" });
+      return;
+    }
+
+    const conflict = await findScheduleConflict(normalized, normalized.id);
 
     if (conflict) {
       res.status(409).json({ error: "Time slot already booked for this property" });
@@ -833,8 +1474,8 @@ app.put("/api/schedules/:id", async (req, res) => {
     await run(
       `
         UPDATE schedules
-        SET propertyTitle = ?, clientName = ?, clientEmail = ?, clientId = ?, date = ?, time = ?,
-            status = ?, notes = ?
+        SET propertyTitle = ?, clientName = ?, clientEmail = ?, clientId = ?, clientPhone = ?, date = ?, time = ?,
+            startTime = ?, endTime = ?, isAllDay = ?, status = ?, notes = ?
         WHERE id = ?
       `,
       [
@@ -842,8 +1483,12 @@ app.put("/api/schedules/:id", async (req, res) => {
         normalized.clientName,
         normalized.clientEmail,
         normalized.clientId,
+        normalized.clientPhone,
         normalized.date,
         normalized.time,
+        normalized.startTime,
+        normalized.endTime,
+        normalized.isAllDay ? 1 : 0,
         normalized.status,
         normalized.notes,
         normalized.id,
@@ -871,8 +1516,19 @@ app.delete("/api/schedules/:id", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const frontendDistPath = path.join(__dirname, "..", "dist");
+const frontendIndexPath = path.join(frontendDistPath, "index.html");
+
+if (fs.existsSync(frontendIndexPath)) {
+  app.use(express.static(frontendDistPath));
+
+  app.get(/^\/(?!api).*/, (_req, res) => {
+    res.sendFile(frontendIndexPath);
+  });
+}
+
+app.listen(PORT, HOST, () => {
+  console.log(`Server running at http://${HOST}:${PORT}`);
 });
 
 process.on("SIGINT", () => {

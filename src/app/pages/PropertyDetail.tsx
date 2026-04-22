@@ -45,15 +45,13 @@ export default function PropertyDetail() {
       return;
     }
 
-    const syncFavorite = () => setIsFavorite(isPropertyFavorite(id));
+    const syncFavorite = async () => setIsFavorite(await isPropertyFavorite(id));
 
     syncFavorite();
     window.addEventListener(FAVORITES_EVENT, syncFavorite);
-    window.addEventListener("storage", syncFavorite);
 
     return () => {
       window.removeEventListener(FAVORITES_EVENT, syncFavorite);
-      window.removeEventListener("storage", syncFavorite);
     };
   }, [id]);
 
@@ -176,9 +174,9 @@ export default function PropertyDetail() {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={() => {
+                onClick={async () => {
                   if (!id) return;
-                  setIsFavorite(toggleFavoriteProperty(id));
+                  setIsFavorite(await toggleFavoriteProperty(id));
                 }}
                 className="p-3 bg-white/95 backdrop-blur-sm hover:bg-white rounded-full shadow-xl transition-colors"
               >
@@ -350,7 +348,6 @@ export default function PropertyDetail() {
               </div>
 
               <div className="space-y-3">
-                <ScheduleVisitModal propertyTitle={property.title} />
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -385,6 +382,15 @@ export default function PropertyDetail() {
             </motion.div>
           </div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="mt-10"
+        >
+          <ScheduleVisitModal propertyTitle={property.title} />
+        </motion.div>
       </div>
 
       <AIAgent />

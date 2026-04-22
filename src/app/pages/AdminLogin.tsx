@@ -6,6 +6,8 @@ import { motion } from "motion/react";
 import { Building2, Lock, Mail, Eye, EyeOff, Shield, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,21 +16,32 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
-    // Simulação de login (em produção, usar Supabase ou API real)
-    setTimeout(() => {
-      if (email === "admin@saopauloparticipacoes.com.br" && password === "admin123") {
-        localStorage.setItem("admin_authenticated", "true");
-        navigate("/admin/dashboard");
-      } else {
-        setError("Credenciais inválidas. Tente novamente.");
-        setIsLoading(false);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Credenciais inválidas. Tente novamente.");
       }
-    }, 1500);
+
+        navigate("/admin/dashboard");
+      return;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Não foi possível fazer login.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fillDemoCredentials = () => {

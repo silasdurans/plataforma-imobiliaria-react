@@ -1,5 +1,6 @@
 /**
- * Utilitários de autenticação do cliente no navegador. Gerencia sessão, cadastro local e atualização do perfil salvo no localStorage.
+ * Utilitários de autenticação do cliente via backend.
+ * A fonte de verdade agora está no servidor, sem persistência local no navegador.
  */
 export interface ClientSession {
   id: string;
@@ -8,90 +9,91 @@ export interface ClientSession {
 }
 
 export interface ClientUser extends ClientSession {
-  password: string;
-  createdAt: string;
   phone?: string;
   bio?: string;
   location?: string;
+  createdAt?: string;
 }
 
-export const CLIENT_USERS_STORAGE_KEY = "grupo-sp-client-users";
-export const CLIENT_SESSION_STORAGE_KEY = "grupo-sp-client-session";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-export const getClientSession = (): ClientSession | null => {
-  const raw = localStorage.getItem(CLIENT_SESSION_STORAGE_KEY);
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw) as ClientSession;
-  } catch {
-    // Evita quebrar a aplicação caso o valor salvo esteja inválido.
-    return null;
-  }
-};
-
-export const saveClientSession = (session: ClientSession) => {
-  localStorage.setItem(CLIENT_SESSION_STORAGE_KEY, JSON.stringify(session));
-};
-
-export const clearClientSession = () => {
-  localStorage.removeItem(CLIENT_SESSION_STORAGE_KEY);
-};
-
-export const getClientUsers = (): ClientUser[] => {
-  const raw = localStorage.getItem(CLIENT_USERS_STORAGE_KEY);
-
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    return JSON.parse(raw) as ClientUser[];
-  } catch {
-    // Se os dados estiverem corrompidos, devolve uma lista vazia como fallback.
-    return [];
-  }
-};
-
-export const saveClientUsers = (users: ClientUser[]) => {
-  localStorage.setItem(CLIENT_USERS_STORAGE_KEY, JSON.stringify(users));
-};
-
-export const getCurrentClientUser = (): ClientUser | null => {
-  const session = getClientSession();
-
-  if (!session) {
-    return null;
-  }
-
-  return getClientUsers().find((user) => user.id === session.id) ?? null;
-};
-
-export const updateCurrentClientUser = (updates: Partial<ClientUser>): ClientUser | null => {
-  const currentUser = getCurrentClientUser();
-
-  if (!currentUser) {
-    return null;
-  }
-
-  const users = getClientUsers();
-  const updatedUser = {
-    ...currentUser,
-    ...updates,
-    // Mantém alguns campos sempre higienizados antes de persistir.
-    name: updates.name?.trim() || currentUser.name,
-    email: updates.email?.trim().toLowerCase() || currentUser.email,
-  };
-
-  saveClientUsers(users.map((user) => (user.id === currentUser.id ? updatedUser : user)));
-  saveClientSession({
-    id: updatedUser.id,
-    name: updatedUser.name,
-    email: updatedUser.email,
+const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    ...init,
   });
 
-  return updatedUser;
+  if (!response.ok) {
+    const text = await response.text();
+    let message = text || `Erro ao acessar ${path}`;
+
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.error || parsed.message || message;
+    } catch {
+      // Mantém o texto original quando a resposta não vem em JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return (await response.json()) as T;
+};
+
+export const fetchClientSession = async (): Promise<ClientUser | null> => {
+  try {
+    return await apiRequest<ClientUser>("/api/client/session");
+  } catch {
+    return null;
+  }
+};
+
+export const registerClient = async (input: {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+}): Promise<ClientUser> =>
+  apiRequest<ClientUser>("/api/client/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+
+export const loginClient = async (input: {
+  email: string;
+  password: string;
+}): Promise<ClientUser> =>
+  apiRequest<ClientUser>("/api/client/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+
+export const clearClientSession = async () => {
+  await apiRequest("/api/client/logout", { method: "POST" });
+};
+
+export const updateCurrentClientUser = async (updates: Partial<ClientUser>) =>
+  apiRequest<ClientUser>("/api/client/profile", {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+
+export const clearLegacyBrowserData = () => {
+  const legacyKeys = [
+    "grupo-sp-client-users",
+    "grupo-sp-client-session",
+    "grupo-sp-properties",
+    "grupo-sp-schedules",
+    "admin_authenticated",
+  ];
+
+  legacyKeys.forEach((key) => localStorage.removeItem(key));
+
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith("grupo-sp-client-favorites:"))
+    .forEach((key) => localStorage.removeItem(key));
 };

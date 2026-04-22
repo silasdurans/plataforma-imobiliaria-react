@@ -7,7 +7,7 @@ import { Sparkles, X, Send, Mic, Calendar, MapPin, DollarSign, Building2, Users,
 import { useNavigate } from "react-router";
 import { useProperties } from "../../data/properties";
 import { addSchedule, getAvailableScheduleTimes } from "../../data/schedules";
-import { getClientSession } from "../lib/clientSession";
+import { fetchClientSession } from "../lib/clientSession";
 
 interface Message {
   id: string;
@@ -199,7 +199,7 @@ export function AIAgent() {
       return false;
     }
 
-    const session = getClientSession();
+    const session = await fetchClientSession();
     if (!session) {
       appendAgentMessage({
         content: "Sua sessão de cliente não está ativa. Faça login novamente para concluir o agendamento.",
@@ -216,14 +216,15 @@ export function AIAgent() {
         clientName: session.name,
         clientEmail: session.email,
         clientId: session.id,
+        clientPhone: session.phone || "",
         date: parsed.date,
         time: parsed.time,
-        status: "agendado",
-        notes: `Agendamento criado via chatbot inteligente para ${property.propertyTitle}.`,
+        status: "confirmado",
+        notes: `Reserva confirmada via chatbot inteligente para ${property.propertyTitle}.`,
       });
 
       appendAgentMessage({
-        content: `Agendamento realizado com sucesso. Visita marcada para ${property.propertyTitle} em ${parsed.displayDate} às ${parsed.time}. O painel administrativo já recebeu esse agendamento.`,
+        content: `Reserva confirmada com sucesso. Visita marcada para ${property.propertyTitle} em ${parsed.displayDate} às ${parsed.time}. O painel administrativo já recebeu esse agendamento.`,
         suggestions: ["Ver imóvel", "Agendar outra visita", "Mostrar mais salas"],
       });
       setPendingSchedule(null);
@@ -237,8 +238,8 @@ export function AIAgent() {
     }
   };
 
-  const startScheduleFlow = (property: PendingSchedule) => {
-    const session = getClientSession();
+  const startScheduleFlow = async (property: PendingSchedule) => {
+    const session = await fetchClientSession();
 
     if (!session) {
       appendAgentMessage({
@@ -257,7 +258,7 @@ export function AIAgent() {
   };
 
   // Simulação de inteligência - analisa a mensagem e retorna resposta contextual
-  const analyzeMessage = (userMessage: string): Message => {
+  const analyzeMessage = async (userMessage: string): Promise<Message> => {
     const lowerMessage = userMessage.toLowerCase();
     
     const intentions = {
@@ -341,7 +342,7 @@ export function AIAgent() {
       const selectedProperty = findPropertyForScheduling(userMessage);
 
       if (selectedProperty) {
-        const session = getClientSession();
+        const session = await fetchClientSession();
         if (!session) {
           responseContent = "Para concluir um agendamento real, faça login como cliente primeiro. Vou te levar para a tela de login.";
           suggestions = ["Ir para login", "Continuar pesquisando"];
@@ -441,8 +442,8 @@ export function AIAgent() {
     }
 
     // Simula processamento da IA
-    setTimeout(() => {
-      const agentResponse = analyzeMessage(currentInput);
+    setTimeout(async () => {
+      const agentResponse = await analyzeMessage(currentInput);
       setMessages(prev => [...prev, agentResponse]);
       setIsTyping(false);
     }, 1000 + Math.random() * 1000);
@@ -488,22 +489,22 @@ export function AIAgent() {
       if (lastResults.some((property) => property.title === suggestion) || properties.some((property) => property.title === suggestion)) {
         const selectedProperty = findPropertyForScheduling(suggestion);
 
-        setTimeout(() => {
+        setTimeout(async () => {
           if (!selectedProperty) {
             requestScheduleSelection();
             setIsTyping(false);
             return;
           }
 
-          startScheduleFlow(selectedProperty);
+          await startScheduleFlow(selectedProperty);
           setIsTyping(false);
         }, 700);
 
         return;
       }
 
-      setTimeout(() => {
-        const agentResponse = analyzeMessage(suggestion);
+      setTimeout(async () => {
+        const agentResponse = await analyzeMessage(suggestion);
         setMessages(prev => [...prev, agentResponse]);
         setIsTyping(false);
       }, 700);

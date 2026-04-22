@@ -10,7 +10,6 @@ import {
   TrendingUp, 
   Calendar,
   Eye,
-  Bell,
   MessageSquare,
   Star,
   MapPin,
@@ -44,6 +43,7 @@ import {
 import {
   useSchedules,
   addSchedule as createSchedule,
+  formatScheduleTimeLabel,
   updateSchedule as persistScheduleUpdate,
   deleteSchedule as removeSchedule,
   type ScheduleItem,
@@ -69,6 +69,7 @@ import {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
   const schedules = useSchedules();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -92,28 +93,35 @@ export default function AdminDashboard() {
 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
+  const [updatingScheduleId, setUpdatingScheduleId] = useState<number | null>(null);
   const [scheduleForm, setScheduleForm] = useState<ScheduleItem>({
     id: 0,
     propertyTitle: '',
     clientName: '',
     clientEmail: '',
+    clientPhone: '',
     date: '',
     time: '',
+    startTime: '',
+    endTime: '',
+    isAllDay: false,
     status: 'agendado',
     notes: '',
     createdAt: ''
   });
 
   useEffect(() => {
-    // Verificar autenticação
-    const isAuthenticated = localStorage.getItem("admin_authenticated");
-    if (!isAuthenticated) {
-      navigate("/admin/login");
-    }
+    fetch(`${API_BASE_URL}/api/admin/session`, { credentials: "include" })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (!payload.authenticated) {
+          navigate("/admin/login");
+        }
+      })
+      .catch(() => navigate("/admin/login"));
 
-    // Carregar propriedades
     loadProperties();
-  }, [navigate]);
+  }, [API_BASE_URL, navigate]);
 
   useEffect(() => {
     const syncProperties = () => {
@@ -271,8 +279,10 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("admin_authenticated");
-    navigate("/admin/login");
+    fetch(`${API_BASE_URL}/api/admin/logout`, {
+      method: "POST",
+      credentials: "include",
+    }).finally(() => navigate("/admin/login"));
   };
 
   const handleAddProperty = () => {
@@ -375,8 +385,12 @@ export default function AdminDashboard() {
       propertyTitle: '',
       clientName: '',
       clientEmail: '',
+      clientPhone: '',
       date: '',
       time: '',
+      startTime: '',
+      endTime: '',
+      isAllDay: false,
       status: 'agendado',
       notes: '',
       createdAt: ''
@@ -386,7 +400,12 @@ export default function AdminDashboard() {
 
   const handleEditSchedule = (schedule: ScheduleItem) => {
     setEditingSchedule(schedule);
-    setScheduleForm(schedule);
+    setScheduleForm({
+      ...schedule,
+      startTime: schedule.startTime || (schedule.isAllDay ? "" : schedule.time),
+      endTime: schedule.endTime || "",
+      isAllDay: !!schedule.isAllDay || schedule.time === "dia-inteiro",
+    });
     setShowScheduleModal(true);
   };
 
@@ -396,31 +415,55 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleScheduleStatusChange = async (schedule: ScheduleItem, status: ScheduleStatus) => {
+    if (schedule.status === status) {
+      return;
+    }
+
+    try {
+      setUpdatingScheduleId(schedule.id);
+      await persistScheduleUpdate(schedule.id, {
+        ...schedule,
+        status,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar status do agendamento:", error);
+      alert("Não foi possível atualizar o status do agendamento.");
+    } finally {
+      setUpdatingScheduleId(null);
+    }
+  };
+
   const handleSaveSchedule = async () => {
+    const isValidPeriod =
+      scheduleForm.isAllDay ||
+      (!!scheduleForm.startTime &&
+        !!scheduleForm.endTime &&
+        scheduleForm.startTime < scheduleForm.endTime);
+
     if (
       !scheduleForm.propertyTitle.trim() ||
       !scheduleForm.clientName.trim() ||
       !scheduleForm.clientEmail.trim() ||
       !scheduleForm.date ||
-      !scheduleForm.time
+      !isValidPeriod
     ) {
-      alert('Preencha imóvel, nome do cliente, e-mail, data e horário.');
+      alert('Preencha imóvel, nome do cliente, e-mail, data e um período válido.');
       return;
     }
 
+    const payload = {
+      ...scheduleForm,
+      time: scheduleForm.isAllDay ? 'dia-inteiro' : scheduleForm.startTime || scheduleForm.time,
+      startTime: scheduleForm.isAllDay ? '' : scheduleForm.startTime || '',
+      endTime: scheduleForm.isAllDay ? '' : scheduleForm.endTime || '',
+      isAllDay: !!scheduleForm.isAllDay,
+    };
+
     if (editingSchedule) {
-      await persistScheduleUpdate(editingSchedule.id, scheduleForm);
+      await persistScheduleUpdate(editingSchedule.id, payload);
     } else {
-      await createSchedule({
-        propertyTitle: scheduleForm.propertyTitle,
-        clientName: scheduleForm.clientName,
-        clientEmail: scheduleForm.clientEmail,
-        clientId: scheduleForm.clientId,
-        date: scheduleForm.date,
-        time: scheduleForm.time,
-        status: scheduleForm.status,
-        notes: scheduleForm.notes,
-      });
+      await createSchedule(payload);
     }
     setShowScheduleModal(false);
   };
@@ -536,6 +579,69 @@ export default function AdminDashboard() {
     return "bg-emerald-100 text-emerald-700";
   };
 
+  const normalizePhone = (value?: string | null) => String(value ?? "").replace(/\D/g, "");
+
+  const formatPhone = (value?: string | null) => {
+    const digits = normalizePhone(value);
+
+    if (!digits) return "Telefone não informado";
+    if (digits.length === 11) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    }
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+
+    return value || digits;
+  };
+
+  const leadEntries = useMemo(() => {
+    return schedules
+      .slice()
+      .sort(
+        (first, second) =>
+          new Date(second.createdAt ?? 0).getTime() - new Date(first.createdAt ?? 0).getTime(),
+      )
+      .map((schedule) => {
+        const rawPhone = schedule.clientPhone || "";
+        const phoneDigits = normalizePhone(rawPhone);
+        const whatsappDigits =
+          phoneDigits.length >= 10 && !phoneDigits.startsWith("55") ? `55${phoneDigits}` : phoneDigits;
+        const createdLabel = schedule.createdAt
+          ? new Intl.DateTimeFormat("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }).format(new Date(schedule.createdAt))
+          : "Data não informada";
+
+        return {
+          ...schedule,
+          timeLabel: formatScheduleTimeLabel(schedule),
+          contactPhone: rawPhone,
+          phoneLabel: formatPhone(rawPhone),
+          hasWhatsApp: whatsappDigits.length >= 12,
+          whatsappHref: whatsappDigits
+            ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(
+                `Olá, ${schedule.clientName}! Vi seu interesse no imóvel "${schedule.propertyTitle}" e posso te ajudar com os próximos passos.`,
+              )}`
+            : "",
+          createdLabel,
+        };
+      });
+  }, [schedules]);
+
+  const leadSummary = useMemo(() => {
+    const total = leadEntries.length;
+    const withPhone = leadEntries.filter((lead) => lead.hasWhatsApp).length;
+    const awaitingContact = leadEntries.filter((lead) => lead.status === "agendado").length;
+    const confirmed = leadEntries.filter((lead) => lead.status === "confirmado").length;
+
+    return { total, withPhone, awaitingContact, confirmed };
+  }, [leadEntries]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Sidebar */}
@@ -572,7 +678,7 @@ export default function AdminDashboard() {
               { id: "overview", icon: BarChart3, label: "Visão Geral" },
               { id: "properties", icon: Building2, label: "Imóveis" },
               { id: "analytics", icon: PieChart, label: "Análises" },
-              { id: "notifications", icon: Bell, label: "Notificações", badge: 12 },
+              { id: "leads", icon: MessageSquare, label: "Leads", badge: leadSummary.awaitingContact || undefined },
               { id: "calendar", icon: Calendar, label: "Agenda" },
             ].map((item) => (
               <button
@@ -1250,15 +1356,29 @@ export default function AdminDashboard() {
                             <div className="text-xs text-slate-500">{schedule.clientEmail}</div>
                           </td>
                           <td className="py-4 px-4 text-slate-600">{schedule.date}</td>
-                          <td className="py-4 px-4 text-slate-600">{schedule.time}</td>
+                          <td className="py-4 px-4 text-slate-600">{formatScheduleTimeLabel(schedule)}</td>
                           <td className="py-4 px-4">
-                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
-                              schedule.status === 'confirmado' ? 'bg-green-100 text-green-700' :
-                              schedule.status === 'agendado' ? 'bg-orange-100 text-orange-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {schedule.status}
-                            </span>
+                            <select
+                              value={schedule.status}
+                              onChange={(event) =>
+                                handleScheduleStatusChange(
+                                  schedule,
+                                  event.target.value as ScheduleStatus,
+                                )
+                              }
+                              disabled={updatingScheduleId === schedule.id}
+                              className={`rounded-full border px-3 py-1 text-sm outline-none transition ${
+                                schedule.status === 'confirmado'
+                                  ? 'border-green-200 bg-green-100 text-green-700'
+                                  : schedule.status === 'agendado'
+                                    ? 'border-orange-200 bg-orange-100 text-orange-700'
+                                    : 'border-red-200 bg-red-100 text-red-700'
+                              } ${updatingScheduleId === schedule.id ? 'cursor-wait opacity-70' : ''}`}
+                            >
+                              <option value="agendado">agendado</option>
+                              <option value="confirmado">confirmado</option>
+                              <option value="cancelado">cancelado</option>
+                            </select>
                           </td>
                           <td className="py-4 px-4">
                             <div className="flex items-center gap-2">
@@ -1287,8 +1407,115 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {activeTab === "leads" && (
+            <div className="space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-[#0F172A]">Central de Leads</h2>
+                  <p className="text-slate-500">
+                    Veja qual imóvel cada cliente escolheu, quando o interesse entrou e acione o contato por WhatsApp.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                {[
+                  { label: "Total de leads", value: leadSummary.total, color: "from-blue-500 to-cyan-600" },
+                  { label: "Aguardando contato", value: leadSummary.awaitingContact, color: "from-orange-500 to-amber-600" },
+                  { label: "Com WhatsApp", value: leadSummary.withPhone, color: "from-emerald-500 to-green-600" },
+                  { label: "Confirmados", value: leadSummary.confirmed, color: "from-violet-500 to-fuchsia-600" },
+                ].map((card) => (
+                  <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className={`mb-4 h-12 w-12 rounded-xl bg-gradient-to-br ${card.color}`} />
+                    <div className="text-3xl font-bold text-[#0F172A]">{card.value}</div>
+                    <div className="mt-1 text-sm text-slate-600">{card.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-[#0F172A]">Leads recebidos</h3>
+                  <span className="text-sm text-slate-500">{leadEntries.length} registro(s)</span>
+                </div>
+
+                {leadEntries.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
+                    Nenhum lead cadastrado ainda.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Cliente</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Imóvel escolhido</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Entrada do lead</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Visita</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Status</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Contato</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leadEntries.map((lead) => (
+                          <tr key={lead.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                            <td className="py-4 px-4">
+                              <div className="font-medium text-[#0F172A]">{lead.clientName}</div>
+                              <div className="text-xs text-slate-500">{lead.clientEmail}</div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="font-medium text-[#0F172A]">{lead.propertyTitle}</div>
+                              {lead.notes && (
+                                <div className="mt-1 text-xs text-slate-500 line-clamp-2">{lead.notes}</div>
+                              )}
+                            </td>
+                            <td className="py-4 px-4 text-sm text-slate-600">{lead.createdLabel}</td>
+                            <td className="py-4 px-4 text-sm text-slate-600">
+                              {lead.date} às {lead.timeLabel}
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                                lead.status === 'confirmado' ? 'bg-green-100 text-green-700' :
+                                lead.status === 'agendado' ? 'bg-orange-100 text-orange-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {lead.status}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="flex flex-col gap-2">
+                                <div className="text-sm text-slate-600">{lead.phoneLabel}</div>
+                                {lead.hasWhatsApp ? (
+                                  <a
+                                    href={lead.whatsappHref}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                                  >
+                                    <MessageSquare className="size-4" />
+                                    Chamar no WhatsApp
+                                  </a>
+                                ) : (
+                                  <span className="text-xs text-slate-400">Cliente sem telefone salvo</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+
           {/* Other Tabs Content */}
-          {activeTab !== "overview" && activeTab !== "properties" && activeTab !== "analytics" && activeTab !== "calendar" && (
+          {activeTab !== "overview" && activeTab !== "properties" && activeTab !== "analytics" && activeTab !== "calendar" && activeTab !== "leads" && (
             <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center">
               <div className="inline-block p-6 bg-slate-100 rounded-full mb-4">
                 <Building2 className="size-12 text-slate-400" />
@@ -1296,7 +1523,7 @@ export default function AdminDashboard() {
               <h3 className="text-2xl font-bold text-[#0F172A] mb-2">
                 {activeTab === "properties" && "Gerenciamento de Imóveis"}
                 {activeTab === "analytics" && "Análises e Relatórios"}
-                {activeTab === "notifications" && "Central de Notificações"}
+                {activeTab === "leads" && "Central de Leads"}
                 {activeTab === "calendar" && "Agenda e Visitas"}
               </h3>
               <p className="text-slate-600">Esta seção está em desenvolvimento</p>
@@ -1534,13 +1761,32 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Horário</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Telefone do cliente</label>
                   <input
-                    type="time"
-                    value={scheduleForm.time}
-                    onChange={(e) => setScheduleForm({ ...scheduleForm, time: e.target.value })}
+                    type="tel"
+                    value={scheduleForm.clientPhone || ""}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, clientPhone: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="(98) 99999-9999"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Formato</label>
+                  <select
+                    value={scheduleForm.isAllDay ? "dia-inteiro" : "periodo"}
+                    onChange={(e) =>
+                      setScheduleForm({
+                        ...scheduleForm,
+                        isAllDay: e.target.value === "dia-inteiro",
+                        time: e.target.value === "dia-inteiro" ? "dia-inteiro" : scheduleForm.startTime || "",
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="periodo">Período com entrada e saída</option>
+                    <option value="dia-inteiro">Dia inteiro</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1555,6 +1801,36 @@ export default function AdminDashboard() {
                     <option value="cancelado">Cancelado</option>
                   </select>
                 </div>
+
+                {!scheduleForm.isAllDay && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Hora de entrada</label>
+                      <input
+                        type="time"
+                        value={scheduleForm.startTime || ""}
+                        onChange={(e) =>
+                          setScheduleForm({
+                            ...scheduleForm,
+                            startTime: e.target.value,
+                            time: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Hora de saída</label>
+                      <input
+                        type="time"
+                        value={scheduleForm.endTime || ""}
+                        onChange={(e) => setScheduleForm({ ...scheduleForm, endTime: e.target.value })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div>

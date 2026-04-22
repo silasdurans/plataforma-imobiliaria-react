@@ -1,70 +1,65 @@
 /**
- * Utilitários para favoritos do cliente. Salva, remove e consulta imóveis marcados no armazenamento local.
+ * Utilitários de favoritos do cliente via backend.
  */
-import { getClientSession } from "./clientSession";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export const FAVORITES_EVENT = "grupo-sp-client-favorites:updated";
-
-const getFavoritesKey = () => {
-  const session = getClientSession();
-  return session ? `grupo-sp-client-favorites:${session.id}` : null;
-};
 
 const emitFavoritesUpdate = () => {
   window.dispatchEvent(new Event(FAVORITES_EVENT));
 };
 
-export const getFavoritePropertyIds = (): string[] => {
-  const key = getFavoritesKey();
+const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
 
-  if (!key) {
-    return [];
+  if (!response.ok) {
+    const text = await response.text();
+    let message = text || `Erro ao acessar ${path}`;
+
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.error || parsed.message || message;
+    } catch {
+      // Mantém o texto bruto se não vier JSON.
+    }
+
+    throw new Error(message);
   }
 
-  const raw = localStorage.getItem(key);
+  return (await response.json()) as T;
+};
 
-  if (!raw) {
-    return [];
-  }
-
+export const getFavoritePropertyIds = async (): Promise<string[]> => {
   try {
-    return JSON.parse(raw) as string[];
+    return await apiRequest<string[]>("/api/client/favorites");
   } catch {
     return [];
   }
 };
 
-export const isPropertyFavorite = (propertyId: string) =>
-  getFavoritePropertyIds().includes(propertyId);
+export const isPropertyFavorite = async (propertyId: string) =>
+  (await getFavoritePropertyIds()).includes(propertyId);
 
-export const toggleFavoriteProperty = (propertyId: string) => {
-  const key = getFavoritesKey();
+export const toggleFavoriteProperty = async (propertyId: string) => {
+  const result = await apiRequest<{ favorite: boolean }>(`/api/client/favorites/${propertyId}`, {
+    method: "POST",
+  });
 
-  if (!key) {
-    return false;
-  }
-
-  const favorites = getFavoritePropertyIds();
-  const nextFavorites = favorites.includes(propertyId)
-    ? favorites.filter((id) => id !== propertyId)
-    : [propertyId, ...favorites];
-
-  localStorage.setItem(key, JSON.stringify(nextFavorites));
   emitFavoritesUpdate();
-
-  return nextFavorites.includes(propertyId);
+  return result.favorite;
 };
 
-export const removeFavoriteProperty = (propertyId: string) => {
-  const key = getFavoritesKey();
+export const removeFavoriteProperty = async (propertyId: string) => {
+  await apiRequest(`/api/client/favorites/${propertyId}`, {
+    method: "DELETE",
+  });
 
-  if (!key) {
-    return;
-  }
-
-  localStorage.setItem(
-    key,
-    JSON.stringify(getFavoritePropertyIds().filter((id) => id !== propertyId)),
-  );
   emitFavoritesUpdate();
 };

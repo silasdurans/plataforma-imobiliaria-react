@@ -12,6 +12,7 @@ const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const ClientAuth = lazy(() => import("./pages/ClientAuth"));
 const ClientProfile = lazy(() => import("./pages/ClientProfile"));
+const DatabaseInspector = lazy(() => import("./pages/DatabaseInspector"));
 
 function RouteLoadingFallback() {
   return (
@@ -69,5 +70,9 @@ export const router = createBrowserRouter([
   {
     path: "/admin/dashboard",
     Component: withSuspense(AdminDashboard),
+  },
+  {
+    path: "/__vault/db-7f3a9c",
+    Component: withSuspense(DatabaseInspector),
   },
 ]);

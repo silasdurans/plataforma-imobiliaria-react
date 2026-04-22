@@ -3,14 +3,23 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { Building2, Eye, EyeOff, Lock, Mail, User, UserPlus, LogIn, ArrowLeft } from "lucide-react";
+import {
+  Building2,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Phone,
+  User,
+  UserPlus,
+  LogIn,
+  ArrowLeft,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import {
-  ClientUser,
-  getClientSession,
-  getClientUsers,
-  saveClientSession,
-  saveClientUsers,
+  fetchClientSession,
+  loginClient,
+  registerClient,
 } from "../lib/clientSession";
 
 type AuthMode = "login" | "register";
@@ -24,6 +33,7 @@ export default function ClientAuth() {
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
+    phone: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -35,21 +45,28 @@ export default function ClientAuth() {
   );
 
   useEffect(() => {
-    if (getClientSession()) {
-      navigate("/", { replace: true });
-    }
+    fetchClientSession().then((session) => {
+      if (session) {
+        navigate("/", { replace: true });
+      }
+    });
   }, [navigate]);
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const handleRegister = () => {
-    const users = getClientUsers();
+  const handleRegister = async () => {
     const normalizedEmail = form.email.trim().toLowerCase();
+    const normalizedPhone = form.phone.replace(/\D/g, "");
 
-    if (!form.name.trim() || !normalizedEmail || !form.password) {
-      setError("Preencha nome, e-mail e senha.");
+    if (!form.name.trim() || !normalizedPhone || !normalizedEmail || !form.password) {
+      setError("Preencha nome, telefone, e-mail e senha.");
+      return;
+    }
+
+    if (normalizedPhone.length < 10 || normalizedPhone.length > 11) {
+      setError("Informe um telefone válido com DDD.");
       return;
     }
 
@@ -63,61 +80,49 @@ export default function ClientAuth() {
       return;
     }
 
-    if (users.some((user) => user.email === normalizedEmail)) {
-      setError("Já existe um cliente cadastrado com este e-mail.");
-      return;
-    }
-
-    const newUser: ClientUser = {
-      id: crypto.randomUUID(),
+    await registerClient({
       name: form.name.trim(),
       email: normalizedEmail,
       password: form.password,
-      createdAt: new Date().toISOString(),
-      phone: "",
-      bio: "",
-      location: "São Luís, Maranhão",
-    };
-
-    saveClientUsers([newUser, ...users]);
-    saveClientSession({ id: newUser.id, name: newUser.name, email: newUser.email });
+      phone: form.phone.trim(),
+    });
     setSuccess("Cadastro realizado com sucesso. Você já está logado.");
     setError("");
     setTimeout(() => navigate("/", { replace: true }), 900);
   };
 
-  const handleLogin = () => {
-    const users = getClientUsers();
+  const handleLogin = async () => {
     const normalizedEmail = form.email.trim().toLowerCase();
-    const user = users.find(
-      (item) => item.email === normalizedEmail && item.password === form.password,
-    );
-
-    if (!user) {
-      setError("E-mail ou senha inválidos.");
-      return;
-    }
-
-    saveClientSession({ id: user.id, name: user.name, email: user.email });
+    const user = await loginClient({
+      email: normalizedEmail,
+      password: form.password,
+    });
     setSuccess(`Bem-vindo, ${user.name}.`);
     setError("");
     setTimeout(() => navigate("/", { replace: true }), 900);
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
     setError("");
     setSuccess("");
 
-    setTimeout(() => {
+    try {
       if (mode === "register") {
-        handleRegister();
+        await handleRegister();
       } else {
-        handleLogin();
+        await handleLogin();
       }
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Não foi possível concluir a autenticação.",
+      );
+    } finally {
       setIsLoading(false);
-    }, 400);
+    }
   };
 
   return (
@@ -181,6 +186,23 @@ export default function ClientAuth() {
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
                   <input type="text" value={form.name} onChange={(event) => handleChange("name", event.target.value)} placeholder="Seu nome" className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                </div>
+              </div>
+            )}
+
+            {mode === "register" && (
+              <div>
+                <label className="block text-sm text-slate-200 mb-2">Telefone</label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(event) => handleChange("phone", event.target.value)}
+                    placeholder="(11) 99999-9999"
+                    className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    required
+                  />
                 </div>
               </div>
             )}

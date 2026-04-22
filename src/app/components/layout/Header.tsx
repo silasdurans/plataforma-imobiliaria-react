@@ -4,17 +4,19 @@
 import { User, Menu, Shield, X, LogOut } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import logo from "../../../assets/logo-grupo-sao-paulo.png";
-import { clearClientSession, getClientSession } from "../../lib/clientSession";
+import { clearClientSession, fetchClientSession, type ClientUser } from "../../lib/clientSession";
 
 export function Header() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  // Recalcula a sessão ao trocar de rota para manter o cabeçalho sincronizado
-  // com login/logout feitos em outras telas.
-  const clientSession = useMemo(() => getClientSession(), [location.pathname]);
-  // Gera as iniciais que aparecem no avatar do cliente logado.
+  const [clientSession, setClientSession] = useState<ClientUser | null>(null);
+
+  useEffect(() => {
+    fetchClientSession().then(setClientSession);
+  }, [location.pathname]);
+
   const avatarFallback = (clientSession?.name ?? "U")
     .split(" ")
     .slice(0, 2)
@@ -24,9 +26,8 @@ export function Header() {
   const isActive = (path: string) => location.pathname === path;
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
-  const handleLogout = () => {
-    // Limpa a sessão local e força retorno para a home.
-    clearClientSession();
+  const handleLogout = async () => {
+    await clearClientSession();
     closeMobileMenu();
     window.location.href = "/";
   };
@@ -41,21 +42,18 @@ export function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-8">
-          <Link to="/" className={`relative transition-colors ${isActive("/") ? "text-[#0F172A]" : "text-slate-500 hover:text-[#0F172A]"}`}>
+          <Link to="/" className={`relative transition-colors ${isActive("/") ? "text-[#0F172A]" : "text-slate-800 hover:text-black"}`}>
             Início
             {isActive("/") && <motion.div layoutId="activeNav" className="absolute -bottom-2 left-0 right-0 h-0.5 bg-[#0F172A] rounded-full" />}
           </Link>
-          <Link to="/resultados" className={`relative transition-colors ${isActive("/resultados") ? "text-[#0F172A]" : "text-slate-500 hover:text-[#0F172A]"}`}>
+          <Link to="/resultados" className={`relative transition-colors ${isActive("/resultados") ? "text-[#0F172A]" : "text-slate-800 hover:text-black"}`}>
             Espaços
             {isActive("/resultados") && <motion.div layoutId="activeNav" className="absolute -bottom-2 left-0 right-0 h-0.5 bg-[#0F172A] rounded-full" />}
           </Link>
-          <a href="https://saopauloparticipacoes.com.br/" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-[#0F172A] transition-colors flex items-center gap-1">
+          <a href="https://saopauloparticipacoes.com.br/" target="_blank" rel="noopener noreferrer" className="text-slate-800 hover:text-black transition-colors flex items-center gap-1">
             Institucional
           </a>
-          <a href="#contato" className="text-slate-500 hover:text-[#0F172A] transition-colors">
-            Contato
-          </a>
-          <Link to="/admin/login" className="text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1.5 text-sm">
+          <Link to="/admin/login" className="text-slate-800 hover:text-black transition-colors flex items-center gap-1.5 text-sm">
             <Shield className="size-4" />
             Admin
           </Link>

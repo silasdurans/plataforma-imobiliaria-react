@@ -5,11 +5,16 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "build:deploy": "vite build",
     "dev": "vite",
+    "dev:host": "vite --host 0.0.0.0 --port 5173",
     "dev:backend": "npm --prefix backend run dev",
+    "dev:backend:host": "HOST=0.0.0.0 npm --prefix backend run dev",
     "dev:ai": "node scripts/dev-ai.mjs",
     "dev:ai:strict": "node scripts/dev-ai.mjs --strict",
-    "dev:full": "concurrently --kill-others-on-fail -n frontend,ai-backend -c blue,green \"npm run dev\" \"npm run dev:ai\""
+    "dev:full": "concurrently --kill-others-on-fail -n frontend,ai-backend -c blue,green \"npm run dev\" \"npm run dev:ai\"",
+    "dev:mobile": "concurrently --kill-others-on-fail -n frontend,backend -c blue,green \"npm run dev:host\" \"npm run dev:backend:host\"",
+    "start": "npm --prefix backend start"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

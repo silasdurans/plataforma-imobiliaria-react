@@ -1,11 +1,10 @@
 /**
- * Camada de dados dos imóveis no frontend. Faz leitura, cache local, sincronização com a API e oferece hooks/utilitários para consumo nas páginas.
+ * Camada de dados dos imóveis no frontend. Faz leitura e escrita diretamente na API.
  */
 import { useEffect, useState } from "react";
 import { properties as seedProperties } from "../app/data/properties";
 
-const STORAGE_KEY = "grupo-sp-properties";
-const STORAGE_EVENT = "grupo-sp-properties:updated";
+const PROPERTIES_EVENT = "grupo-sp-properties:updated";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80";
@@ -36,12 +35,8 @@ export interface Property {
 type PropertyDraft = Partial<Property> &
   Pick<Property, "title" | "description" | "price" | "location">;
 
-const isBrowser = () => typeof window !== "undefined";
-
 const dispatchPropertiesEvent = () => {
-  if (!isBrowser()) return;
-  // Dispara um evento interno para manter múltiplos componentes sincronizados.
-  window.dispatchEvent(new Event(STORAGE_EVENT));
+  window.dispatchEvent(new Event(PROPERTIES_EVENT));
 };
 
 const normalizeProperty = (property: Partial<Property>, index = 0): Property => {
@@ -97,38 +92,9 @@ const defaultProperties: Property[] = seedProperties.map((property, index) =>
   ),
 );
 
-const cacheProperties = (properties: Property[], shouldDispatch = false) => {
-  if (!isBrowser()) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(properties));
-  if (shouldDispatch) {
-    dispatchPropertiesEvent();
-  }
-};
-
-const loadCachedProperties = (): Property[] => {
-  if (!isBrowser()) {
-    return defaultProperties;
-  }
-
-  const storedProperties = localStorage.getItem(STORAGE_KEY);
-
-  if (!storedProperties) {
-    cacheProperties(defaultProperties);
-    return defaultProperties;
-  }
-
-  try {
-    const parsedProperties = JSON.parse(storedProperties) as Partial<Property>[];
-    return parsedProperties.map((property, index) => normalizeProperty(property, index));
-  } catch {
-    // Em caso de cache corrompido, recria a base local com os dados padrão.
-    cacheProperties(defaultProperties);
-    return defaultProperties;
-  }
-};
-
 const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
@@ -154,30 +120,20 @@ const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export const renderizarImoveis = (): Property[] =>
-  loadCachedProperties().sort((first, second) =>
+  defaultProperties.sort((first, second) =>
     (second.created_at ?? "").localeCompare(first.created_at ?? ""),
   );
 
 export const getAllProperties = async (): Promise<Property[]> => {
-  try {
-    const properties = (await apiRequest<Partial<Property>[]>("/api/properties")).map((property, index) =>
-      normalizeProperty(property, index),
-    );
-    cacheProperties(properties);
-    return properties;
-  } catch {
-    // Se a API estiver indisponível, a aplicação continua funcionando com cache/local seed.
-    return renderizarImoveis();
-  }
+  const properties = (await apiRequest<Partial<Property>[]>("/api/properties")).map((property, index) =>
+    normalizeProperty(property, index),
+  );
+  return properties;
 };
 
 export const getPropertyById = async (id: string): Promise<Property | undefined> => {
-  try {
-    const property = await apiRequest<Partial<Property>>(`/api/properties/${id}`);
-    return normalizeProperty(property);
-  } catch {
-    return renderizarImoveis().find((property) => property.id === id);
-  }
+  const property = await apiRequest<Partial<Property>>(`/api/properties/${id}`);
+  return normalizeProperty(property);
 };
 
 export const addProperty = async (property: Omit<Property, "id" | "created_at" | "updated_at">): Promise<string> => {
@@ -188,8 +144,7 @@ export const addProperty = async (property: Omit<Property, "id" | "created_at" |
       body: JSON.stringify(payload),
     }),
   );
-  const current = renderizarImoveis().filter((item) => item.id !== created.id);
-  cacheProperties([created, ...current], true);
+  dispatchPropertiesEvent();
   return created.id;
 };
 
@@ -200,32 +155,32 @@ export const updateProperty = async (id: string, updates: Partial<Property>): Pr
       body: JSON.stringify({ ...updates, id }),
     }),
   );
-  const next = renderizarImoveis().map((property) => (property.id === id ? updated : property));
-  cacheProperties(next, true);
+  void updated;
+  dispatchPropertiesEvent();
 };
 
 export const deleteProperty = async (id: string): Promise<void> => {
   await apiRequest(`/api/properties/${id}`, { method: "DELETE" });
-  const filteredProperties = renderizarImoveis().filter((property) => property.id !== id);
-  cacheProperties(filteredProperties, true);
+  dispatchPropertiesEvent();
 };
 
 export const useProperties = () => {
-  const [properties, setProperties] = useState<Property[]>(() => renderizarImoveis());
+  const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
     const syncProperties = async () => {
-      setProperties(await getAllProperties());
+      try {
+        setProperties(await getAllProperties());
+      } catch {
+        setProperties([]);
+      }
     };
 
-    // Sincroniza tanto alterações da aba atual quanto de outras abas do navegador.
     syncProperties();
-    window.addEventListener(STORAGE_EVENT, syncProperties);
-    window.addEventListener("storage", syncProperties);
+    window.addEventListener(PROPERTIES_EVENT, syncProperties);
 
     return () => {
-      window.removeEventListener(STORAGE_EVENT, syncProperties);
-      window.removeEventListener("storage", syncProperties);
+      window.removeEventListener(PROPERTIES_EVENT, syncProperties);
     };
   }, []);
 

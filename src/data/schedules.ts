@@ -1,5 +1,5 @@
 /**
- * Camada de dados dos agendamentos. Centraliza leitura, persistência e atualização das visitas marcadas.
+ * Camada de dados dos agendamentos. Centraliza leitura e persistência exclusivamente pela API.
  */
 import { useEffect, useState } from "react";
 
@@ -11,36 +11,22 @@ export interface ScheduleItem {
   clientName: string;
   clientEmail: string;
   clientId?: string | null;
+  clientPhone?: string;
   date: string;
   time: string;
+  startTime?: string;
+  endTime?: string;
+  isAllDay?: boolean;
   status: ScheduleStatus;
   notes?: string;
   createdAt?: string;
 }
 
-const STORAGE_KEY = "grupo-sp-schedules";
-const STORAGE_EVENT = "grupo-sp-schedules:updated";
+const SCHEDULES_EVENT = "grupo-sp-schedules:updated";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-const defaultSchedules: ScheduleItem[] = [
-  {
-    id: 1,
-    propertyTitle: "Apartamento Luxuoso no Centro",
-    clientName: "Ana Clara",
-    clientEmail: "ana@email.com",
-    date: "2026-04-15",
-    time: "10:30",
-    status: "agendado",
-    notes: "Verificar disponibilidade de mobília",
-    createdAt: "2026-04-10T10:30:00.000Z",
-  },
-];
-
-const isBrowser = () => typeof window !== "undefined";
-
 const dispatchSchedulesEvent = () => {
-  if (!isBrowser()) return;
-  window.dispatchEvent(new Event(STORAGE_EVENT));
+  window.dispatchEvent(new Event(SCHEDULES_EVENT));
 };
 
 const normalizeSchedule = (schedule: Partial<ScheduleItem>, index = 0): ScheduleItem => ({
@@ -49,23 +35,35 @@ const normalizeSchedule = (schedule: Partial<ScheduleItem>, index = 0): Schedule
   clientName: schedule.clientName?.trim() || "",
   clientEmail: schedule.clientEmail?.trim().toLowerCase() || "",
   clientId: schedule.clientId ?? null,
+  clientPhone: schedule.clientPhone?.trim() || "",
   date: schedule.date?.trim() || "",
   time: schedule.time?.trim() || "",
+  startTime: schedule.startTime?.trim() || "",
+  endTime: schedule.endTime?.trim() || "",
+  isAllDay:
+    schedule.isAllDay === true ||
+    schedule.isAllDay === 1 ||
+    schedule.time?.trim() === "dia-inteiro",
   status: schedule.status ?? "agendado",
   notes: schedule.notes ?? "",
   createdAt: schedule.createdAt ?? new Date().toISOString(),
 });
 
-const cacheSchedules = (schedules: ScheduleItem[], shouldDispatch = false) => {
-  if (!isBrowser()) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(schedules));
-  if (shouldDispatch) {
-    dispatchSchedulesEvent();
+export const formatScheduleTimeLabel = (schedule: Pick<ScheduleItem, "time" | "startTime" | "endTime" | "isAllDay">) => {
+  if (schedule.isAllDay || schedule.time === "dia-inteiro") {
+    return "Dia inteiro";
   }
+
+  if (schedule.startTime && schedule.endTime) {
+    return `${schedule.startTime} - ${schedule.endTime}`;
+  }
+
+  return schedule.startTime || schedule.time || "Não informado";
 };
 
 const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
@@ -91,38 +89,29 @@ const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export const getSchedules = (): ScheduleItem[] => {
-  if (!isBrowser()) {
-    return defaultSchedules;
-  }
-
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    cacheSchedules(defaultSchedules);
-    return defaultSchedules;
-  }
-
-  try {
-    return (JSON.parse(raw) as Partial<ScheduleItem>[]).map((item, index) => normalizeSchedule(item, index));
-  } catch {
-    cacheSchedules(defaultSchedules);
-    return defaultSchedules;
-  }
+  return [];
 };
 
 export const fetchSchedules = async (): Promise<ScheduleItem[]> => {
-  try {
-    const schedules = (await apiRequest<Partial<ScheduleItem>[]>("/api/schedules")).map((item, index) =>
-      normalizeSchedule(item, index),
-    );
-    cacheSchedules(schedules);
-    return schedules;
-  } catch {
-    return getSchedules();
-  }
+  return (await apiRequest<Partial<ScheduleItem>[]>("/api/schedules")).map((item, index) =>
+    normalizeSchedule(item, index),
+  );
 };
 
 export const getAvailableScheduleTimes = async (propertyTitle: string, date: string): Promise<string[]> => {
   const schedules = await fetchSchedules();
+  const hasAllDayBooking = schedules.some(
+    (schedule) =>
+      schedule.propertyTitle === propertyTitle &&
+      schedule.date === date &&
+      schedule.status !== "cancelado" &&
+      (schedule.isAllDay || schedule.time === "dia-inteiro"),
+  );
+
+  if (hasAllDayBooking) {
+    return [];
+  }
+
   const bookedTimes = schedules
     .filter(
       (schedule) =>
@@ -144,39 +133,40 @@ export const addSchedule = async (
       body: JSON.stringify(schedule),
     }),
   );
-  cacheSchedules([created, ...getSchedules().filter((item) => item.id !== created.id)], true);
+  dispatchSchedulesEvent();
   return created;
 };
 
 export const updateSchedule = async (id: number, updates: Partial<ScheduleItem>) => {
-  const updated = normalizeSchedule(
-    await apiRequest<Partial<ScheduleItem>>(`/api/schedules/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ ...updates, id }),
-    }),
-  );
-  const schedules = getSchedules().map((schedule) => (schedule.id === id ? updated : schedule));
-  cacheSchedules(schedules, true);
+  await apiRequest<Partial<ScheduleItem>>(`/api/schedules/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ ...updates, id }),
+  });
+  dispatchSchedulesEvent();
 };
 
 export const deleteSchedule = async (id: number) => {
   await apiRequest(`/api/schedules/${id}`, { method: "DELETE" });
-  cacheSchedules(getSchedules().filter((schedule) => schedule.id !== id), true);
+  dispatchSchedulesEvent();
 };
 
 export const useSchedules = () => {
-  const [schedules, setSchedules] = useState<ScheduleItem[]>(() => getSchedules());
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
 
   useEffect(() => {
-    const sync = async () => setSchedules(await fetchSchedules());
+    const sync = async () => {
+      try {
+        setSchedules(await fetchSchedules());
+      } catch {
+        setSchedules([]);
+      }
+    };
 
     sync();
-    window.addEventListener(STORAGE_EVENT, sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener(SCHEDULES_EVENT, sync);
 
     return () => {
-      window.removeEventListener(STORAGE_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      window.removeEventListener(SCHEDULES_EVENT, sync);
     };
   }, []);
 

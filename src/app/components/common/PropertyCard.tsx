@@ -36,15 +36,13 @@ export function PropertyCard({
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
-    const syncFavorite = () => setIsFavorite(isPropertyFavorite(id));
+    const syncFavorite = async () => setIsFavorite(await isPropertyFavorite(id));
 
     syncFavorite();
     window.addEventListener(FAVORITES_EVENT, syncFavorite);
-    window.addEventListener("storage", syncFavorite);
 
     return () => {
       window.removeEventListener(FAVORITES_EVENT, syncFavorite);
-      window.removeEventListener("storage", syncFavorite);
     };
   }, [id]);
 
@@ -64,9 +62,9 @@ export function PropertyCard({
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.preventDefault();
-              setIsFavorite(toggleFavoriteProperty(id));
+              setIsFavorite(await toggleFavoriteProperty(id));
             }}
             className="absolute top-4 right-4 size-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-all z-10 shadow-lg"
           >
