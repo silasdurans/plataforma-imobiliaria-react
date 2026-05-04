@@ -4,12 +4,19 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Finalizado-blue?style=flat-square)](STATUS.md)
 
-> Plataforma moderna de imóveis comerciais com busca inteligente por IA, construída com React, TypeScript e Tailwind CSS v4.
+> Plataforma moderna de imóveis comerciais com busca inteligente por IA, desenvolvida como projeto acadêmico no 1º ciclo da faculdade. Construída com React, TypeScript e Tailwind CSS v4.
 
 ---
 
-## ✨ Destaques
+## 📌 Sobre Este Projeto
+
+Este é um **projeto finalizado** desenvolvido durante o **1º ciclo acadêmico** como um trabalho em grupo. O projeto apresenta as melhores práticas de desenvolvimento web moderno, arquitetura de componentes e integração com IA local.
+
+> 💡 **Nota:** Este projeto não está em desenvolvimento ativo. Veja [STATUS.md](STATUS.md) para mais detalhes.
+
+---
 
 - 🤖 **Busca Inteligente com IA** - Interpretação semântica usando Ollama local
 - 💬 **Chatbot Assistente** - Suporte em tempo real para navegação e agendamento
@@ -309,14 +316,6 @@ npm run build
 - ✅ CORS configurado
 
 ---
-
-## 🤝 Contribuindo
-
-1. Faça um Fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
 
 ---
 
