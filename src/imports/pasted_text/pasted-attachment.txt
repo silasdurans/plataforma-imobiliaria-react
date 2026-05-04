@@ -1,0 +1,109 @@
+Criar um footer moderno, organizado e informativo, transmitindo confiança e profissionalismo no setor imobiliário.
+
+O footer deve ter layout em colunas, com boa hierarquia visual e espaçamento confortável.
+
+Estrutura do Footer
+Coluna 1 – Sobre a empresa
+
+Logo da empresa
+
+Pequena descrição institucional
+
+Exemplo:
+
+"A São Paulo Participações atua há mais de 30 anos no mercado imobiliário brasileiro, oferecendo soluções inteligentes para locação e gestão de espaços comerciais."
+
+Coluna 2 – Navegação
+
+Links rápidos para:
+
+Início
+
+Buscar Espaços
+
+Como Funciona
+
+Sobre a Empresa
+
+Contato
+
+Coluna 3 – Recursos da Plataforma
+
+Links para funcionalidades importantes:
+
+Sistema de filtros inteligentes
+
+Recomendação com IA
+
+Assistente virtual (chatbot)
+
+Comparar espaços
+
+Favoritos
+
+Coluna 4 – Suporte
+
+Links de suporte ao usuário:
+
+Central de ajuda
+
+Perguntas frequentes
+
+Política de privacidade
+
+Termos de uso
+
+Coluna 5 – Contato
+
+Informações institucionais:
+
+Email de contato
+
+Telefone
+
+Localização da empresa
+
+Adicionar também ícones de redes sociais:
+
+LinkedIn
+
+Instagram
+
+Facebook
+
+Parte inferior do Footer
+
+Criar uma linha inferior discreta contendo:
+
+Copyright
+
+Nome da empresa
+
+Ano atual
+
+Exemplo:
+
+© 2026 São Paulo Participações — Todos os direitos reservados.
+
+Estilo visual do Footer
+
+Design moderno e elegante:
+
+fundo cinza escuro ou azul institucional
+
+texto branco ou cinza claro
+
+ícones minimalistas
+
+separadores sutis entre seções
+
+O footer deve transmitir credibilidade, organização e solidez no mercado imobiliário.
+
+✅ Dica de UX para melhorar ainda mais:
+Adicionar também no footer:
+
+mini campo de busca de espaços
+
+botão para abrir o chatbot rapidamente
+
+Assim o usuário sempre terá uma forma rápida de continuar navegando ou buscar um espaço.

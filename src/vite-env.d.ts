@@ -1,0 +1,13 @@
+/**
+ * Declarações de tipos do Vite para o TypeScript. Permite reconhecer importações e variáveis específicas do ambiente.
+ */
+/// <reference types="vite/client" />
+
+declare module '*.avif';
+declare module '*.bmp';
+declare module '*.gif';
+declare module '*.jpg';
+declare module '*.jpeg';
+declare module '*.png';
+declare module '*.svg';
+declare module '*.webp';
