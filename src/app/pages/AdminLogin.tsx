@@ -6,7 +6,9 @@ import { motion } from "motion/react";
 import { Building2, Lock, Mail, Eye, EyeOff, Shield, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+const ADMIN_EMAIL = "admin@saopauloparticipacoes.com.br";
+const ADMIN_PASSWORD = "admin123";
+const ADMIN_SESSION_KEY = "grupo-sp-admin-session";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -22,21 +24,13 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+        localStorage.setItem(ADMIN_SESSION_KEY, "true");
+        navigate("/admin/dashboard");
+      } else {
         throw new Error("Credenciais inválidas. Tente novamente.");
       }
-
-        navigate("/admin/dashboard");
-      return;
     } catch (error) {
       setError(error instanceof Error ? error.message : "Não foi possível fazer login.");
     } finally {

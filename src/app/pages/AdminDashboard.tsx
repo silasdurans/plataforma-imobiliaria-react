@@ -69,7 +69,6 @@ import {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
   const schedules = useSchedules();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -111,17 +110,11 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/admin/session`, { credentials: "include" })
-      .then((response) => response.json())
-      .then((payload) => {
-        if (!payload.authenticated) {
-          navigate("/admin/login");
-        }
-      })
-      .catch(() => navigate("/admin/login"));
-
+    if (!localStorage.getItem("grupo-sp-admin-session")) {
+      navigate("/admin/login");
+    }
     loadProperties();
-  }, [API_BASE_URL, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     const syncProperties = () => {
@@ -279,10 +272,8 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    fetch(`${API_BASE_URL}/api/admin/logout`, {
-      method: "POST",
-      credentials: "include",
-    }).finally(() => navigate("/admin/login"));
+    localStorage.removeItem("grupo-sp-admin-session");
+    navigate("/admin/login");
   };
 
   const handleAddProperty = () => {

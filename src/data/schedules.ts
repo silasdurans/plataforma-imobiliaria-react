@@ -1,6 +1,3 @@
-/**
- * Camada de dados dos agendamentos. Centraliza leitura e persistência exclusivamente pela API.
- */
 import { useEffect, useState } from "react";
 
 export type ScheduleStatus = "agendado" | "confirmado" | "cancelado";
@@ -23,7 +20,7 @@ export interface ScheduleItem {
 }
 
 const SCHEDULES_EVENT = "grupo-sp-schedules:updated";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+const STORAGE_KEY = "grupo-sp-schedules";
 
 const dispatchSchedulesEvent = () => {
   window.dispatchEvent(new Event(SCHEDULES_EVENT));
@@ -42,14 +39,16 @@ const normalizeSchedule = (schedule: Partial<ScheduleItem>, index = 0): Schedule
   endTime: schedule.endTime?.trim() || "",
   isAllDay:
     schedule.isAllDay === true ||
-    schedule.isAllDay === 1 ||
+    (schedule.isAllDay as unknown) === 1 ||
     schedule.time?.trim() === "dia-inteiro",
   status: schedule.status ?? "agendado",
   notes: schedule.notes ?? "",
   createdAt: schedule.createdAt ?? new Date().toISOString(),
 });
 
-export const formatScheduleTimeLabel = (schedule: Pick<ScheduleItem, "time" | "startTime" | "endTime" | "isAllDay">) => {
+export const formatScheduleTimeLabel = (
+  schedule: Pick<ScheduleItem, "time" | "startTime" | "endTime" | "isAllDay">,
+) => {
   if (schedule.isAllDay || schedule.time === "dia-inteiro") {
     return "Dia inteiro";
   }
@@ -61,65 +60,45 @@ export const formatScheduleTimeLabel = (schedule: Pick<ScheduleItem, "time" | "s
   return schedule.startTime || schedule.time || "Não informado";
 };
 
-const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    let message = text || `Erro ao acessar ${path}`;
-
-    try {
-      const parsed = JSON.parse(text);
-      message = parsed.error || parsed.message || message;
-    } catch {
-      // Keep original text when response is not JSON.
-    }
-
-    throw new Error(message);
+const loadFromStorage = (): ScheduleItem[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored) as ScheduleItem[];
+  } catch {
+    // ignore parse errors
   }
-
-  return (await response.json()) as T;
-};
-
-export const getSchedules = (): ScheduleItem[] => {
   return [];
 };
 
-export const fetchSchedules = async (): Promise<ScheduleItem[]> => {
-  return (await apiRequest<Partial<ScheduleItem>[]>("/api/schedules")).map((item, index) =>
-    normalizeSchedule(item, index),
-  );
+const saveToStorage = (schedules: ScheduleItem[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(schedules));
 };
 
-export const getAvailableScheduleTimes = async (propertyTitle: string, date: string): Promise<string[]> => {
-  const schedules = await fetchSchedules();
+export const getSchedules = (): ScheduleItem[] => loadFromStorage();
+
+export const fetchSchedules = async (): Promise<ScheduleItem[]> => loadFromStorage();
+
+export const getAvailableScheduleTimes = async (
+  propertyTitle: string,
+  date: string,
+): Promise<string[]> => {
+  const schedules = loadFromStorage();
   const hasAllDayBooking = schedules.some(
-    (schedule) =>
-      schedule.propertyTitle === propertyTitle &&
-      schedule.date === date &&
-      schedule.status !== "cancelado" &&
-      (schedule.isAllDay || schedule.time === "dia-inteiro"),
+    (s) =>
+      s.propertyTitle === propertyTitle &&
+      s.date === date &&
+      s.status !== "cancelado" &&
+      (s.isAllDay || s.time === "dia-inteiro"),
   );
 
-  if (hasAllDayBooking) {
-    return [];
-  }
+  if (hasAllDayBooking) return [];
 
   const bookedTimes = schedules
     .filter(
-      (schedule) =>
-        schedule.propertyTitle === propertyTitle &&
-        schedule.date === date &&
-        schedule.status !== "cancelado",
+      (s) =>
+        s.propertyTitle === propertyTitle && s.date === date && s.status !== "cancelado",
     )
-    .map((schedule) => schedule.time);
+    .map((s) => s.time);
 
   return ["09:00", "11:00", "14:00", "16:00"].filter((time) => !bookedTimes.includes(time));
 };
@@ -127,26 +106,31 @@ export const getAvailableScheduleTimes = async (propertyTitle: string, date: str
 export const addSchedule = async (
   schedule: Omit<ScheduleItem, "id" | "createdAt">,
 ): Promise<ScheduleItem> => {
-  const created = normalizeSchedule(
-    await apiRequest<Partial<ScheduleItem>>("/api/schedules", {
-      method: "POST",
-      body: JSON.stringify(schedule),
-    }),
-  );
+  const schedules = loadFromStorage();
+  const nextId = schedules.length > 0 ? Math.max(...schedules.map((s) => s.id)) + 1 : 1;
+  const created = normalizeSchedule({
+    ...schedule,
+    id: nextId,
+    createdAt: new Date().toISOString(),
+  });
+  schedules.push(created);
+  saveToStorage(schedules);
   dispatchSchedulesEvent();
   return created;
 };
 
 export const updateSchedule = async (id: number, updates: Partial<ScheduleItem>) => {
-  await apiRequest<Partial<ScheduleItem>>(`/api/schedules/${id}`, {
-    method: "PUT",
-    body: JSON.stringify({ ...updates, id }),
-  });
-  dispatchSchedulesEvent();
+  const schedules = loadFromStorage();
+  const index = schedules.findIndex((s) => s.id === id);
+  if (index !== -1) {
+    schedules[index] = normalizeSchedule({ ...schedules[index], ...updates, id });
+    saveToStorage(schedules);
+    dispatchSchedulesEvent();
+  }
 };
 
 export const deleteSchedule = async (id: number) => {
-  await apiRequest(`/api/schedules/${id}`, { method: "DELETE" });
+  saveToStorage(loadFromStorage().filter((s) => s.id !== id));
   dispatchSchedulesEvent();
 };
 
@@ -154,12 +138,8 @@ export const useSchedules = () => {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
 
   useEffect(() => {
-    const sync = async () => {
-      try {
-        setSchedules(await fetchSchedules());
-      } catch {
-        setSchedules([]);
-      }
+    const sync = () => {
+      setSchedules(loadFromStorage());
     };
 
     sync();

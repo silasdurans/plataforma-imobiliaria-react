@@ -1,11 +1,8 @@
-/**
- * Camada de dados dos imóveis no frontend. Faz leitura e escrita diretamente na API.
- */
 import { useEffect, useState } from "react";
 import { properties as seedProperties } from "../app/data/properties";
 
 const PROPERTIES_EVENT = "grupo-sp-properties:updated";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+const STORAGE_KEY = "grupo-sp-properties";
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80";
 
@@ -40,8 +37,6 @@ const dispatchPropertiesEvent = () => {
 };
 
 const normalizeProperty = (property: Partial<Property>, index = 0): Property => {
-  // Garante que todo imóvel tenha os campos esperados pelo frontend,
-  // mesmo quando vier incompleto do localStorage ou da API.
   const mainImage = property.image || property.images?.[0] || DEFAULT_IMAGE;
   const size = Number(property.size ?? property.area ?? 60);
   const capacity = Number(property.capacity ?? property.bedrooms ?? 4);
@@ -92,75 +87,58 @@ const defaultProperties: Property[] = seedProperties.map((property, index) =>
   ),
 );
 
-const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    let message = text || `Erro ao acessar ${path}`;
-
-    try {
-      const parsed = JSON.parse(text);
-      message = parsed.error || parsed.message || message;
-    } catch {
-      // Keep original text when response is not JSON.
-    }
-
-    throw new Error(message);
+const loadFromStorage = (): Property[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored) as Property[];
+  } catch {
+    // ignore parse errors
   }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultProperties));
+  return defaultProperties;
+};
 
-  return (await response.json()) as T;
+const saveToStorage = (properties: Property[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(properties));
 };
 
 export const renderizarImoveis = (): Property[] =>
-  defaultProperties.sort((first, second) =>
-    (second.created_at ?? "").localeCompare(first.created_at ?? ""),
-  );
+  loadFromStorage().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
-export const getAllProperties = async (): Promise<Property[]> => {
-  const properties = (await apiRequest<Partial<Property>[]>("/api/properties")).map((property, index) =>
-    normalizeProperty(property, index),
-  );
-  return properties;
-};
+export const getAllProperties = async (): Promise<Property[]> => loadFromStorage();
 
-export const getPropertyById = async (id: string): Promise<Property | undefined> => {
-  const property = await apiRequest<Partial<Property>>(`/api/properties/${id}`);
-  return normalizeProperty(property);
-};
+export const getPropertyById = async (id: string): Promise<Property | undefined> =>
+  loadFromStorage().find((p) => p.id === id);
 
-export const addProperty = async (property: Omit<Property, "id" | "created_at" | "updated_at">): Promise<string> => {
-  const payload = normalizeProperty(property);
-  const created = normalizeProperty(
-    await apiRequest<Partial<Property>>("/api/properties", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  );
+export const addProperty = async (
+  property: Omit<Property, "id" | "created_at" | "updated_at">,
+): Promise<string> => {
+  const properties = loadFromStorage();
+  const now = new Date().toISOString();
+  const created = normalizeProperty({ ...property, created_at: now, updated_at: now });
+  properties.unshift(created);
+  saveToStorage(properties);
   dispatchPropertiesEvent();
   return created.id;
 };
 
 export const updateProperty = async (id: string, updates: Partial<Property>): Promise<void> => {
-  const updated = normalizeProperty(
-    await apiRequest<Partial<Property>>(`/api/properties/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ ...updates, id }),
-    }),
-  );
-  void updated;
-  dispatchPropertiesEvent();
+  const properties = loadFromStorage();
+  const index = properties.findIndex((p) => p.id === id);
+  if (index !== -1) {
+    properties[index] = normalizeProperty({
+      ...properties[index],
+      ...updates,
+      id,
+      updated_at: new Date().toISOString(),
+    });
+    saveToStorage(properties);
+    dispatchPropertiesEvent();
+  }
 };
 
 export const deleteProperty = async (id: string): Promise<void> => {
-  await apiRequest(`/api/properties/${id}`, { method: "DELETE" });
+  saveToStorage(loadFromStorage().filter((p) => p.id !== id));
   dispatchPropertiesEvent();
 };
 
@@ -168,12 +146,8 @@ export const useProperties = () => {
   const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
-    const syncProperties = async () => {
-      try {
-        setProperties(await getAllProperties());
-      } catch {
-        setProperties([]);
-      }
+    const syncProperties = () => {
+      setProperties(loadFromStorage());
     };
 
     syncProperties();
@@ -188,5 +162,5 @@ export const useProperties = () => {
 };
 
 export const initializeDatabase = async (): Promise<void> => {
-  await getAllProperties();
+  loadFromStorage();
 };

@@ -1,7 +1,3 @@
-/**
- * Utilitários de autenticação do cliente via backend.
- * A fonte de verdade agora está no servidor, sem persistência local no navegador.
- */
 export interface ClientSession {
   id: string;
   name: string;
@@ -15,41 +11,35 @@ export interface ClientUser extends ClientSession {
   createdAt?: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+interface StoredUser extends ClientUser {
+  password: string;
+}
 
-const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
+const SESSION_KEY = "grupo-sp-client-session";
+const USERS_KEY = "grupo-sp-client-users";
 
-  if (!response.ok) {
-    const text = await response.text();
-    let message = text || `Erro ao acessar ${path}`;
-
-    try {
-      const parsed = JSON.parse(text);
-      message = parsed.error || parsed.message || message;
-    } catch {
-      // Mantém o texto original quando a resposta não vem em JSON.
-    }
-
-    throw new Error(message);
+const loadUsers = (): StoredUser[] => {
+  try {
+    const stored = localStorage.getItem(USERS_KEY);
+    if (stored) return JSON.parse(stored) as StoredUser[];
+  } catch {
+    // ignore
   }
+  return [];
+};
 
-  return (await response.json()) as T;
+const saveUsers = (users: StoredUser[]) => {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
 };
 
 export const fetchClientSession = async (): Promise<ClientUser | null> => {
   try {
-    return await apiRequest<ClientUser>("/api/client/session");
+    const stored = localStorage.getItem(SESSION_KEY);
+    if (stored) return JSON.parse(stored) as ClientUser;
   } catch {
-    return null;
+    // ignore
   }
+  return null;
 };
 
 export const registerClient = async (input: {
@@ -57,43 +47,57 @@ export const registerClient = async (input: {
   email: string;
   password: string;
   phone: string;
-}): Promise<ClientUser> =>
-  apiRequest<ClientUser>("/api/client/register", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+}): Promise<ClientUser> => {
+  const users = loadUsers();
+  if (users.some((u) => u.email === input.email)) {
+    throw new Error("E-mail já cadastrado.");
+  }
+  const user: StoredUser = {
+    id: `client-${Date.now()}`,
+    name: input.name,
+    email: input.email,
+    password: input.password,
+    phone: input.phone,
+    createdAt: new Date().toISOString(),
+  };
+  users.push(user);
+  saveUsers(users);
+  const { password: _pw, ...session } = user;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  return session;
+};
 
 export const loginClient = async (input: {
   email: string;
   password: string;
-}): Promise<ClientUser> =>
-  apiRequest<ClientUser>("/api/client/login", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-
-export const clearClientSession = async () => {
-  await apiRequest("/api/client/logout", { method: "POST" });
+}): Promise<ClientUser> => {
+  const users = loadUsers();
+  const user = users.find((u) => u.email === input.email && u.password === input.password);
+  if (!user) throw new Error("E-mail ou senha incorretos.");
+  const { password: _pw, ...session } = user;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  return session;
 };
 
-export const updateCurrentClientUser = async (updates: Partial<ClientUser>) =>
-  apiRequest<ClientUser>("/api/client/profile", {
-    method: "PUT",
-    body: JSON.stringify(updates),
-  });
+export const clearClientSession = async () => {
+  localStorage.removeItem(SESSION_KEY);
+};
+
+export const updateCurrentClientUser = async (updates: Partial<ClientUser>): Promise<ClientUser> => {
+  const stored = localStorage.getItem(SESSION_KEY);
+  if (!stored) throw new Error("Nenhuma sessão ativa.");
+  const current = JSON.parse(stored) as ClientUser;
+  const updated = { ...current, ...updates };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+  const users = loadUsers();
+  const index = users.findIndex((u) => u.id === current.id);
+  if (index !== -1) {
+    users[index] = { ...users[index], ...updates };
+    saveUsers(users);
+  }
+  return updated;
+};
 
 export const clearLegacyBrowserData = () => {
-  const legacyKeys = [
-    "grupo-sp-client-users",
-    "grupo-sp-client-session",
-    "grupo-sp-properties",
-    "grupo-sp-schedules",
-    "admin_authenticated",
-  ];
-
-  legacyKeys.forEach((key) => localStorage.removeItem(key));
-
-  Object.keys(localStorage)
-    .filter((key) => key.startsWith("grupo-sp-client-favorites:"))
-    .forEach((key) => localStorage.removeItem(key));
+  // no-op: dados já estão no localStorage, nada para limpar
 };
