@@ -134,12 +134,6 @@ export default function Home() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 relative z-10">
-          {aiStatus && !aiStatus.available && (
-            <div className="mb-6 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-sm">
-              Busca com IA local indisponivel no momento. {aiStatus.message} O sistema continua com a busca inteligente local.
-            </div>
-          )}
-
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center mb-16">
             <div className="inline-block mb-4">
               <div className="flex items-center gap-2 px-4 py-2 bg-white/10 text-blue-300 rounded-full text-sm border border-white/10 backdrop-blur-sm">
